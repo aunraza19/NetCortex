@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bccl8oh3r</task-id>
+<tool-use-id>toolu_01Y6hxxNfr8bmnpLKdxcrBt8</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bccl8oh3r.output</output-file>
+<status>completed</status>
+<summary>Background command "Reset CHR, rerun uplink_down e2e" completed (exit code 0)</summary>
+</task-notification>
