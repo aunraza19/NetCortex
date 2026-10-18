@@ -1,0 +1,69 @@
+Read CLAUDE.md and docs/PARTNER_PLAN.md
+
+---
+
+yes copy.
+
+---
+
+<pasted_content id="5505">
+Review the open PR from the partner with gh pr view and gh pr diff. Check:
+
+Does it only touch Workstream B folders (see CLAUDE.md)?
+Does it add root files: pyproject.toml, uv.lock, .gitignore, a uv workspace, LICENSE?
+Does it define its own versions of shared types (Cause, MetricsWindow, DetectionResult, etc.) instead of importing from packages/core?
+Any secrets, .env, or large data files committed?
+Obvious bugs or missing tests.
+
+Don’t change anything. Summarise and tell me if it’s safe to merge before A0/A1.
+
+3. Branching: always branch from the latest main, and merge small and often. Don’t build on each other’s unmerged branches. The only files that really conflict are the root files (pyproject.toml, uv.lock, .gitignore) and packages/core. You own those, so they decide the order:
+
+If his PR stays inside his folders and adds no root config: merge it first. Then create a/core from the updated main and do A0 + A1.
+If his PR adds a root workspace or defines shared types locally: don’t merge it yet. Do A0 + A1 on a/core from current main and merge that within the hour. He then rebases onto main, imports from packages/core, deletes his local copies, and his PR merges after.
+
+The second case is more likely, since he had nothing to import from. Either way it’s a short delay for him, and it gives you one set of root config instead of two competing ones.
+
+If uv.lock ever conflicts, don’t hand-merge it. Take either side, then run uv lock to regenerate it.
+</pasted_content id="5505">
+
+see the partners docs filder for docs created by its agent in his pr.
+dont change anything jsut reseach and give suggestion to me
+
+---
+
+we have to first set the entire. claude said this:
+
+<pasted_content id="5505">
+what about the entire?
+partner did set it up. i will tell him to do from onw on. 
+we have to set it up too
+
+Flagging the risk of exposing secrets in shared session transcripts.
+Yes, set it up on your laptop now, before Claude Code makes its first commit on a/core. Entire’s hooks are installed per clone, so your partner’s setup doesn’t cover you.
+
+Steps (laptop):
+
+Install it. You’re on Windows (Git Bash), so use the Scoop command from Entire’s GitHub README. The curl install script may also work in Git Bash. Check with entire version.
+Enable it in the repo root:
+bash
+   entire enable --agent claude-code
+Log in so sessions show on entire.io for the post: entire login.
+Check what changed: run git status. For Claude Code, Entire adds hooks to .claude/settings.json. Committing that is fine; it only affects Claude Code, not your partner’s Codex.
+Restart Claude Code in VS Code. Hooks load when a session starts, so your current session isn’t being recorded. Restart before it commits A0, and paste your last instruction back in.
+Verify after the first commit and push: entire checkpoint list should show it, and git branch -a should show entire/checkpoints/v1 on the remote.
+One important warning: the repo is public. Entire pushes full session transcripts to the entire/checkpoints/v1 branch on the same remote by default, so anything Claude Code sees becomes public. So:
+
+Never paste keys or DATABASE_URL into the Claude Code chat.
+Block Claude Code from reading .env. Add a deny rule to .claude/settings.json:
+json
+  { "permissions": { "deny": ["Read(./.env)", "Read(./.env.*)"] } }
+Claude Code can still write .env.example. You fill in the real .env by hand.
+
+Tell your partner the same. Codex reading his .env would leak his keys into the public sessions branch too.
+If a secret does slip into a session, rotate that key. Deleting it from the branch isn’t enough, since it’s already been pushed.
+</pasted_content id="5505">
+
+---
+
+we will use the python 3.14 for this project
