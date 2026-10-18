@@ -39,7 +39,7 @@ flowchart TD
 | `simgen calibrate` | real baseline rows, optional exact target-role map and explicit proxy opt-in | Group statistics by target and Pakistan hour; restrict proxy transfer to public DNS ping roles | Calibration/report with coverage, defaults, source targets and transfer uncertainty |
 | `simgen generate` | days, seed, scenario configuration | Seeded demand/noise and incident transforms | Probe/interface Parquet plus separate expected labels |
 | `simgen replay` / `inject` | site, cause, duration, seed | Active simulator runtime; DB writes need Aun's keys/runtime agreement | Current metrics and scenario label; explicit missing-runtime/contract failure |
-| `detect(site_id, window, history)` | observed shared MetricsWindow | Lag features -> TabPFN forecasts/anomaly/cause | Shared DetectionResult and approved forecast writes, or unavailable error |
+| `detect(site_id, window, history)` | observed shared MetricsWindow | Lag features -> prepared TabPFN forecasts/anomaly/cause | Shared DetectionResult, or unavailable error; worker owns forecast writes |
 | `search_runbook(query, k)` | question and result count | Ollama query embedding -> pgvector retrieval | Shared RunbookChunk objects with source URLs |
 | `check_news(provider, target)` | upstream provider/target | Recent SerpApi search | Shared NewsCheck with links; explicit unavailable summary on failure |
 | Dashboard navigation | site/incident selection | Fixture transport or Aun's HTTP API | Rendered status/evidence, loading state or visible error |
@@ -85,3 +85,12 @@ no forecast writes; MonitorSiteWorkflow owns persistence. Core exposes fetch_sit
 The detector needs an explicitly prepared real TabPFN context for cloud/local
 inference. Gate 2 will prepare it from TRAIN and normal VALIDATION observations,
 without reading TEST labels at inference. Provider failures remain unavailable.
+
+Gate 2 entry is `python eval/gate2.py`. It calls `prepare_detector(cases, artifact)`
+for TRAIN/VALIDATION JSON and Parquet, then `configure_detector(artifact)` to fit
+and cache the real provider. The runner seeds bounded simulated history for
+north-tower, calls public simgen inject, and fetches only past source=sim rows
+through core's database pool. Public detect returns a core DetectionResult;
+the runner validates provenance, quantiles and horizons and compares forecast
+row counts. Exit is a sanitized JSON/Markdown report with measured timing and
+an explicit pass or failure. No migrations or live-router operations occur.

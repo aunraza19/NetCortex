@@ -469,17 +469,26 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
     # Prior history is context only. It supplies observations, never labels or expected causes.
     probes = _combine_observations(history.probe_metrics, window.probe_metrics)
     interfaces = _combine_observations(history.iface_metrics, window.iface_metrics)
-    target_roles = {
-        target: ("dns:" + target[4:] if target.startswith("dns:") else target)
-        for target in probes.get("target", pd.Series(dtype=str)).dropna().astype(str).unique()
-    }
+    target_roles = _identity_target_roles(probes)
     settings = Settings()
-    token = settings.tabpfn_token.get_secret_value() if settings.tabpfn_token else None
     from netcortex_detector import providers
+    from netcortex_detector.preparation import get_prepared_detector
 
-    backend = providers.TabPFNBackend(
-        settings.tabpfn_mode, access_token=token, timeout_s=settings.http_timeout_s
-    )
+    prepared = get_prepared_detector()
+    if prepared is None:
+        token = settings.tabpfn_token.get_secret_value() if settings.tabpfn_token else None
+        backend = providers.TabPFNBackend(
+            settings.tabpfn_mode, access_token=token, timeout_s=settings.http_timeout_s
+        )
+        if not str(getattr(backend, "provenance", "")).startswith("fixture:"):
+            raise DetectorUnavailable(
+                "public detect requires configure_detector() before real provider inference"
+            )
+        threshold = None
+    else:
+        backend, threshold = prepared
+        if backend.mode != settings.tabpfn_mode:
+            raise DetectorUnavailable("prepared detector mode does not match current Settings")
     result = run_engine(
         probes,
         interfaces,
@@ -487,6 +496,7 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
         as_of=window.as_of,
         backend=backend,
         config=DetectorConfig(target_roles=target_roles),
+        anomaly_threshold=threshold,
     )
     if result["availability"] != "available":
         raise DetectorUnavailable(f"detector data unavailable ({result['status']})")
@@ -544,6 +554,14 @@ def _combine_observations(history: pd.DataFrame, current: pd.DataFrame) -> pd.Da
         return current.copy()
     combined = pd.concat(frames, ignore_index=True).drop_duplicates(keep="last")
     return combined
+
+
+def _identity_target_roles(probes: pd.DataFrame) -> dict[str, str]:
+    """Keep each observed target name intact when building feature columns."""
+    return {
+        str(target): str(target)
+        for target in probes.get("target", pd.Series(dtype=str)).dropna().unique()
+    }
 
 
 def fingerprint(frame: pd.DataFrame) -> str:

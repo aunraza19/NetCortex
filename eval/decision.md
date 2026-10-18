@@ -6,3 +6,10 @@
 - `--mode mock` is an explicit fixture backend used to check data wiring and report generation. Its outputs are never described as TabPFN accuracy. `cloud` and `local` use actual provider adapter code and preserve unavailable/error statuses.
 - False alerts/site-day uses the union of scored normal detection-window exposure per site. Cause accuracy and event precision/recall include explicit denominators. Missing agent investigation, template validation, and CHR infrastructure are `unavailable`, never 0% or assumed passes. Per-case latency is recorded for completed detector runs; event delay is unavailable because each case is a single as-of snapshot. Injected investigator, parameter-validator, and CHR-check callbacks are measured only from actual returned records.
 - Supplemental DNS/subscriber/backhaul Parquet remains experimental and is not read by this evaluator. Core DNS RTT is not treated as DNS-resolution evidence, and aggregate counters do not identify a subscriber.
+
+## Gate 2 real-provider smoke
+
+- Keep the credentialed smoke in `eval/gate2.py`, separate from the mock evaluation CLI. It prepares only the detector's TRAIN/VALIDATION artifact and asks the public simulator and detector entry points to perform the real flow.
+- Seed only bounded, missing, source=`sim` normal telemetry for `north-tower`. Existing Site topology is read and preserved; existing metric keys in the seed interval are skipped. The current injection interval is never replaced when the site overlap guard rejects it.
+- Query core probe, interface and subscriber columns with site, source and inclusive time predicates. Keep history strictly before current-window start and subset smoke inference to two named probe targets plus primary `ether1`; report actual metric time bounds and exact subset, and make plumbing-only claims.
+- Capture provider output in memory, redact known runtime secrets and credential patterns from failure chains, and write a sanitized JSON/Markdown result. Compare forecast row counts around public detect and fail if they change. No migrations, deletes or router calls belong in this runner.

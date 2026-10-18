@@ -217,6 +217,39 @@ def test_public_core_adapter_rejects_non_core_windows():
         detect("s1", object(), object())
 
 
+def test_public_detect_requires_real_startup_setup_before_provider_calls(monkeypatch):
+    from netcortex_core import MetricsWindow, Settings
+
+    from netcortex_detector import engine, providers
+    from netcortex_detector.preparation import clear_prepared_detector
+
+    probes, interfaces = frames(minutes=6)
+    probes["kind"] = "icmp"
+    interfaces["rx_bps"] = 100
+    interfaces["tx_bps"] = 100
+    window = MetricsWindow(
+        as_of=probes.time.max().to_pydatetime(),
+        probe_metrics=probes,
+        iface_metrics=interfaces,
+    )
+
+    class UnpreparedRealBackend:
+        provenance = "tabpfn-cloud:v3.5"
+        mode = "cloud"
+
+        def forecasts(self, history, horizon):
+            pytest.fail("detect must reject an unprepared backend before provider calls")
+
+    monkeypatch.setattr(engine, "Settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(providers, "TabPFNBackend", lambda *args, **kwargs: UnpreparedRealBackend())
+    clear_prepared_detector()
+    try:
+        with pytest.raises(DetectorUnavailable, match="configure_detector"):
+            detect("s1", window, window)
+    finally:
+        clear_prepared_detector()
+
+
 def test_forecast_compare_only_uses_prior_forecast_samples():
     from netcortex_detector.engine import consecutive_forecast_exceedances
 
@@ -358,6 +391,8 @@ def test_walk_forward_rule_needs_three_actual_exceedances():
 
 
 def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
+    from contextlib import nullcontext
+
     from netcortex_detector.providers import TabPFNBackend
 
     calls = {"reg_fit": 0, "predict": 0, "clf_fit": 0, "unsup_fit": 0}
@@ -411,6 +446,14 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
     package.__path__ = []
     monkeypatch.setitem(__import__("sys").modules, "tabpfn_extensions", package)
     monkeypatch.setitem(__import__("sys").modules, "tabpfn_extensions.unsupervised", extension)
+    seeded_values = []
+    fake_torch = SimpleNamespace(
+        manual_seed=seeded_values.append,
+        random=SimpleNamespace(
+            fork_rng=lambda *, devices: nullcontext(),
+        )
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
     backend = Backend("local")
     p, i = frames(minutes=20)
@@ -438,11 +481,15 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
         == "uplink_congestion"
     )
     normal = pd.DataFrame([features.iloc[index] for index in range(10)])
+    normal["rtt_ms_constant"] = 42.0
     backend.fit_anomaly(normal)
     assert calls["unsup_fit"] == 1
+    assert "rtt_ms_constant" not in backend._anomaly_columns
+    assert all(normal[column].nunique() > 1 for column in backend._anomaly_columns)
     reference = [backend.raw_anomaly(normal.iloc[index]) for index in range(3)]
     backend.set_anomaly_reference(reference)
     assert 0.0 <= backend.anomaly(features.iloc[-1]) <= 1.0
+    assert seeded_values == [73021] * 4
 
     large_p, large_i = frames(minutes=600)
     large = build_features(large_p, large_i, site_id="s1", as_of=large_p.time.max())

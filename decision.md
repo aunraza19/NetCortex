@@ -9,7 +9,7 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Build B1-B9 and B11; exclude Tinker | Agreed scope; establish the working product before optional fine-tuning | No fine-tuned planner is claimed |
 | Start on `b/workstream-b`; isolate parallel workers in `b/data-simgen`, `b/runbook-notify`, `b/web-dashboard` worktrees | Keep main untouched and concurrent writes separate | Lead integrates owned paths and validates before pushing |
 | Coding workers use `gpt-6-luna`, medium reasoning | User requested this model and lead/worker division | Lead specifies, reviews, tests and handles integration |
-| Aun owns core, Settings, migrations, API, workflows, agent and router infrastructure | The shared build brief explicitly reserves those contracts | We write requests and use lazy imports; no replacement schemas |
+| Aun owns core, Settings, migrations, API, workflows, agent and router infrastructure | The shared build brief explicitly reserves those contracts | Import merged core directly; no replacement schemas |
 | Build independent engines with plain data and explicit fixture modes | Core was initially absent; its merged contracts now bind public wrappers | Fixture success does not establish live integration |
 | Use core DNS/subscriber contracts for the corresponding observations | Core now carries subscriber IP/traffic and DNS-kind probes; ICMP remains separate | Never fabricate offending IPs or claim DNS diagnosis from ping alone |
 | Separate training, validation and final evaluation | Tuning thresholds on final tests inflates measured quality | Freeze thresholds before held-out scoring and report actual denominators |
@@ -45,10 +45,10 @@ on implementation commit `d60ffac`.
 
 ## Current external gates
 
-At the final integration refresh, upstream main still contains only README.md. Aun must publish
-core/backend contracts. Database, tailnet, API keys, Sentry projects, Render and
-domain access are not yet supplied. Their live checks remain pending until
-verified; none are replaced with invented pass results.
+Core, agent, fixes and collector are now merged. Database and TabPFN credentials
+are configured locally for the bounded Gate 2 check. Embedding setup, retrieval
+ingestion and hosting remain separate verification gates; fixture results do not
+establish those integrations.
 
 ## Core integration and scope update
 
@@ -59,8 +59,34 @@ models, preserve SecretStr and ModuleUnavailable, and never write forecasts from
 detect. DNS/subscriber observations and atomic simulator injection now use core.
 The embedding model setting is embeddinggemma. Customer messages stay text.
 
-Current follow-up is Gate 2 only, in a small separate PR: prepare legitimate TRAIN
+Current follow-up is Gate 2 only, on the same branch and PR #1: prepare legitimate TRAIN
 and VALIDATION contexts, inject sim rows, and call actual TabPFN through detect.
 A missing trained backend is an explicit unavailable result, not mock inference.
 See [security verification](docs/SECURITY_VERIFICATION.md) for the redacted public
 history/checkpoint audit and the current sandbox enforcement limitation.
+
+The lead wrote preparation and runner acceptance tests before implementation.
+Startup uses a versioned JSON artifact rather than serialized provider objects,
+so credentials and SDK state never enter the artifact. TRAIN supplies supervised
+cause context and normal density context; three normal VALIDATION snapshots
+provide a limited plumbing reference. TEST files are excluded. This does not
+establish detector accuracy or a production threshold. Repeated detect calls
+reuse the configured backend, and the worker remains responsible for persistence.
+
+The first credentialed setup exposed a real SDK assertion for constant training
+metrics. Density fitting now excludes constant columns using normal TRAIN only;
+it fails if no varying metric remains. Reference and live scores use the same
+seeded feature order and CPU noise, with caller RNG state restored. Review also
+found that rotated credentials or changed timeouts could reuse stale setup;
+the cache now includes an internal configuration digest and rebuilds on changes.
+
+The credentialed Gate 2 run returned a valid cloud DetectionResult with four
+five-point series and no forecast-table row change. Setup took 271.7 seconds and
+detect took 114.8 seconds. It predicted uplink_down for uplink_congestion. These
+results establish integration only; model quality and latency need separate work.
+The [sanitized report](eval/results/gate2.md) records the measured result.
+
+Main advanced during verification with Aun's CHR PR #6. The same branch was
+rebased again onto d70f76f and uv lock rerun. Main's four required root files
+remain identical. The combined suite passes 220 offline tests with three live
+tests deselected, including with unmocked Torch imports blocked.

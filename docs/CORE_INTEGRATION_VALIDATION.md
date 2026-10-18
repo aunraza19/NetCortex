@@ -39,9 +39,9 @@ existing PR ready. A passing mock result cannot satisfy real Gate 2.
 
 ## Gate 2 only, after integration delivery
 
-Use a small separate B branch/PR for any further corrections. Obtain existing
-DATABASE_URL and TabPFN credentials from local process/Windows environment only;
-never print them or read .env. Check schema existence without migrating. Use a
+Keep updates on b/workstream-b and PR #1, per the user's latest instruction.
+Runtime Settings may load the local ignored .env internally; the agent must never
+open it or print credentials. Check schema existence without migrating. Use a
 dedicated simulated site; preserve home-lab live telemetry. Inject a scenario,
 load an as-of MetricsWindow plus strictly prior history, call public detect with
 actual TabPFN, and validate DetectionResult, real provider identity, finite score,

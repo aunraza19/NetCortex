@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+import random
+import sys
 import warnings
+from threading import Lock
 from typing import Any
 
 import numpy as np
@@ -13,6 +16,8 @@ RAW_METRIC_PREFIXES = ("rtt_ms_", "loss_pct_", "iface_util_pct_")
 LAG_PREFIXES = ("rtt_ms_", "jitter_ms_", "loss_pct_", "iface_")
 DERIVED_SUFFIXES = ("_lag1", "_mean5", "_std5")
 MAX_TRAINING_ROWS = 2048
+ANOMALY_PERMUTATION_SEED = 73021
+_ANOMALY_PERMUTATION_LOCK = Lock()
 
 
 def _array(frame: pd.DataFrame) -> np.ndarray:
@@ -159,6 +164,9 @@ class TabPFNBackend:
         self._unsupervised: Any | None = None
         self._anomaly_columns: list[str] = []
         self._anomaly_reference: np.ndarray | None = None
+        self._cause_features: pd.DataFrame | None = None
+        self._cause_labels: list[str] | None = None
+        self._unsupervised_module: Any | None = None
 
     def _imports(self) -> tuple[Any, Any]:
         if self._model_classes is not None:
@@ -229,6 +237,8 @@ class TabPFNBackend:
             raise ValueError("training labels contain unsupported causes")
         x, y = _array(features), np.asarray(labels)
         self._classifier(x, y)
+        self._cause_features = features.copy()
+        self._cause_labels = list(labels)
         return fingerprint(pd.DataFrame(np.column_stack((x, y))))
 
     def predict_cause(
@@ -247,7 +257,9 @@ class TabPFNBackend:
         return str(model.classes_[ix]), float(probs[0][ix])
 
     def cause(self, vector: pd.Series) -> tuple[str, float]:
-        raise DetectorUnavailable("cause classifier requires explicit TRAIN-only feature vectors")
+        if self._cause_features is None or self._cause_labels is None:
+            raise DetectorUnavailable("cause classifier has not been prepared from TRAIN data")
+        return self.predict_cause(vector, self._cause_features, self._cause_labels)
 
     @staticmethod
     def _predictor_columns(frame: pd.DataFrame) -> list[str]:
@@ -339,13 +351,24 @@ class TabPFNBackend:
 
     def fit_anomaly(self, normal_training_features: pd.DataFrame) -> None:
         columns = [
-            name for name in normal_training_features if name.startswith(RAW_METRIC_PREFIXES)
+            name
+            for name in normal_training_features
+            if name.startswith(RAW_METRIC_PREFIXES) and not name.endswith(DERIVED_SUFFIXES)
         ]
         data = normal_training_features[columns].replace([np.inf, -np.inf], np.nan).dropna()
-        if len(data) < 5 or not columns:
+        if len(data) < 5:
             raise DetectorUnavailable(
                 "TabPFN anomaly scoring needs at least five normal TRAIN snapshots"
             )
+        # The density regressor requires a non-degenerate target support. Constant
+        # raw metrics cannot define a continuous density, so omit them using TRAIN
+        # observations only; derived/lag features are already excluded above.
+        columns = [name for name in columns if data[name].nunique(dropna=True) > 1]
+        if not columns:
+            raise DetectorUnavailable(
+                "TabPFN anomaly scoring needs a varying raw metric in normal TRAIN"
+            )
+        data = data[columns]
         try:
             self._imports()
             clf, reg = self._new_model("classifier"), self._new_model("regressor")
@@ -353,6 +376,9 @@ class TabPFNBackend:
                 "tabpfn_extensions.unsupervised", fromlist=["TabPFNUnsupervisedModel"]
             )
             self._unsupervised = module.TabPFNUnsupervisedModel(tabpfn_clf=clf, tabpfn_reg=reg)
+            self._unsupervised_module = sys.modules.get(
+                module.TabPFNUnsupervisedModel.__module__
+            )
             self._unsupervised.fit(_array(data))
             self._anomaly_columns = columns
         except Exception as exc:
@@ -364,10 +390,28 @@ class TabPFNBackend:
                 "TabPFN anomaly model has not been fit on normal TRAIN snapshots"
             )
         try:
+            import torch
+
             data = np.asarray(
                 [vector.reindex(self._anomaly_columns, fill_value=0.0)], dtype=np.float32
             )
-            result = self._unsupervised.outliers(data, n_permutations=1)
+            # The extension uses both its module-level Python RNG for feature ordering
+            # and torch's CPU RNG for density noise. Forking preserves the caller's RNG.
+            with _ANOMALY_PERMUTATION_LOCK, torch.random.fork_rng(devices=[]):
+                torch.manual_seed(ANOMALY_PERMUTATION_SEED)
+                if self._unsupervised_module is not None and hasattr(
+                    self._unsupervised_module, "random"
+                ):
+                    previous_random = self._unsupervised_module.random
+                    self._unsupervised_module.random = random.Random(
+                        ANOMALY_PERMUTATION_SEED
+                    )
+                    try:
+                        result = self._unsupervised.outliers(data, n_permutations=1)
+                    finally:
+                        self._unsupervised_module.random = previous_random
+                else:
+                    result = self._unsupervised.outliers(data, n_permutations=1)
             return float(
                 np.asarray(result.detach().cpu() if hasattr(result, "detach") else result).reshape(
                     -1

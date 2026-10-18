@@ -24,6 +24,12 @@ Lead verification, 2026-10-18. No credential values are recorded in this file.
 - Scan reports remain ignored under `.build-check/security`; only redacted
   findings/counts were displayed. Current provider keys were not compared or printed.
 - GitGuardian's PR result is checked again after pushing the rebased branch.
+- A later upstream refresh increased the public checkpoint refs from 18 to 22
+  and updated three existing refs. The repeated full-history/checkpoint scan
+  returned 3,039 generic-rule occurrences, all privately classified as dated
+  API feature flags; zero unclassified findings. No captured values were printed.
+  The Gate 2 staged-content scan found zero findings, and GitGuardian passed
+  before the final refresh onto Aun's newly merged CHR work.
 
 ## Codex deny-read profile
 
