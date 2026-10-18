@@ -132,6 +132,42 @@ async def monitor_site(site_id: str) -> MonitorResult:
 # --- Incident steps -------------------------------------------------------------------
 
 
+def _second_opinion(incident_id: UUID, site_id: str, as_of: datetime) -> DetectionResult | None:
+    if not modules.tabpfn_ready():
+        return None
+    with db.get_pool().connection() as conn:
+        window = db.fetch_window(conn, site_id, as_of - WINDOW, as_of)
+        history = db.fetch_window(conn, site_id, as_of - WINDOW - HISTORY, as_of - WINDOW)
+    with sentry_sdk.start_span(op="netcortex.detect", name=f"tabpfn {site_id}") as span:
+        try:
+            tabpfn = modules.tabpfn_detect(site_id, window, history)
+        except Exception as exc:  # the incident goes on without it
+            span.set_status("internal_error")
+            activity.logger.warning("TabPFN second opinion failed: %s", type(exc).__name__)
+            return None
+    if tabpfn is None:
+        return None
+    with db.get_pool().connection() as conn:
+        db.upsert_forecasts(conn, site_id, tabpfn)
+        _event(
+            conn,
+            EventKind.INCIDENT_UPDATED,
+            incident_id,
+            site_id,
+            status="open",
+            note=f"TabPFN second opinion: {tabpfn.cause_guess.value}",
+        )
+    return tabpfn
+
+
+@activity.defn
+async def second_opinion(
+    incident_id: UUID, site_id: str, as_of: datetime
+) -> DetectionResult | None:
+    """Ask the partner's TabPFN detector about a new incident; None if it isn't set up."""
+    return await asyncio.to_thread(_second_opinion, incident_id, site_id, as_of)
+
+
 def _save_report(incident_id: UUID, site_id: str, report: IncidentReport) -> None:
     with db.get_pool().connection() as conn:
         db.save_report(conn, incident_id, report)
@@ -283,6 +319,7 @@ async def verify_fix(
 
 ALL = [
     monitor_site,
+    second_opinion,
     save_report,
     check_fix,
     set_status,
