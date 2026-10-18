@@ -1,0 +1,12 @@
+<pasted_content id="5505">
+git gardian flagged this on pr:
+⚠️ GitGuardian has uncovered 2 secrets following the scan of your pull request.
+Please consider investigating the findings and remediating the incidents. Failure to do so may lead to compromising the associated services or software components.
+
+🔎 Detected hardcoded secrets in your pull request
+
+GitGuardian id	GitGuardian status	Secret	Commit	Filename	
+38360472	Triggered	Username Password	1793b41	packages/core/src/netcortex_core/settings.py	View secret
+38360473	Triggered	PostgreSQL Credentials	3dad39e	packages/core/tests/test_core_migrate.py	View secret
+🛠 Guidelines to remediate hardcoded secrets
+</pasted_content id="5505">
