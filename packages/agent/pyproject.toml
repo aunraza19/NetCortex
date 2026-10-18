@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netcortex-agent"
+version = "0.1.0"
+description = "Pydantic AI incident investigator on local Gemma"
+requires-python = ">=3.12,<3.13"
+dependencies = ["netcortex-core", "netcortex-fixes", "pydantic-ai-slim[openai]>=1.0,<2"]
+
+[tool.uv.sources]
+netcortex-core = { workspace = true }
+netcortex-fixes = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netcortex_agent"]

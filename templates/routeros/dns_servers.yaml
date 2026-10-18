@@ -1,0 +1,27 @@
+id: dns_servers
+description: Switch the router's upstream DNS resolvers and clear its DNS cache.
+status: untested on CHR
+allowed_causes: [dns_slow]
+params:
+  servers:
+    type: ipv4_list
+    min_items: 1
+    max_items: 3
+    description: New resolvers, e.g. ["1.1.1.1", "8.8.8.8"].
+  previous_servers:
+    type: ipv4_list
+    min_items: 0
+    max_items: 3
+    default: []
+    set_by: router
+    description: Resolvers before the change, read from the router by the fix checker.
+apply: |
+  /ip dns set servers={{ servers | join(',') }}
+  /ip dns cache flush
+rollback: |
+  /ip dns set servers={{ previous_servers | join(',') }}
+  /ip dns cache flush
+verify:
+  metric: rtt_ms
+  goal: decrease
+  by_pct: 30

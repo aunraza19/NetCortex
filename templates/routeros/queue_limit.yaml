@@ -1,0 +1,28 @@
+id: queue_limit
+description: Cap one subscriber IP or subnet so it cannot fill the uplink.
+status: untested on CHR
+allowed_causes: [heavy_user]
+params:
+  target:
+    type: ipv4_or_cidr
+    description: Subscriber IP or subnet to limit, e.g. 10.0.0.42 or 10.0.0.40/29.
+  upload_mbps:
+    type: int
+    min: 1
+    max: 1000
+    description: Upload cap in Mbit/s. A fair cap is about 5% of the uplink capacity.
+  download_mbps:
+    type: int
+    min: 1
+    max: 1000
+    description: Download cap in Mbit/s, well below the user's current rate. A fair cap is about 10% of the uplink capacity.
+# A new simple queue is added at the end of the list. On routers that already have one
+# queue per subscriber, it must be moved above that subscriber's queue to take effect.
+apply: |
+  /queue simple add name="netcortex-limit-{{ target | replace('/', '_') }}" target={{ target }} max-limit={{ upload_mbps }}M/{{ download_mbps }}M comment="netcortex:queue_limit"
+rollback: |
+  /queue simple remove [find name="netcortex-limit-{{ target | replace('/', '_') }}"]
+verify:
+  metric: rtt_ms
+  goal: decrease
+  by_pct: 20
