@@ -6,6 +6,8 @@ rejects any template or param the fix templates don't allow, the error goes back
 model once, and a second failure falls back to template `none`.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -26,9 +28,16 @@ from netcortex_core import (
     db,
     get_settings,
 )
+from pydantic import BaseModel, PrivateAttr
 from pydantic_ai import Agent, ModelRetry, RunContext, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.messages import ModelMessage, ModelResponse, RetryPromptPart, ToolCallPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelResponse,
+    RetryPromptPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.ollama import OllamaProvider
 
@@ -65,13 +74,30 @@ FALLBACK_EN = "We are looking into a network problem and will update you soon."
 FALLBACK_UR = "ہم نیٹ ورک کے ایک مسئلے کو دیکھ رہے ہیں اور جلد آپ کو آگاہ کریں گے۔"
 
 
-@dataclass
-class Deps:
+class Deps(BaseModel):
+    """What the tools see. Plain data, so Temporal can pass it to activities."""
+
     site_id: str
     detection: DetectionResult
-    window: MetricsWindow
+    window: facts.WindowData
     site: Site | None = None
-    news: NewsCheck | None = None  # last check_news result, copied into the report
+    _metrics: MetricsWindow | None = PrivateAttr(default=None)
+
+    def metrics(self) -> MetricsWindow:
+        if self._metrics is None:
+            self._metrics = self.window.to_window()
+        return self._metrics
+
+    @classmethod
+    def build(
+        cls, site_id: str, detection: DetectionResult, window: MetricsWindow, site: Site | None
+    ) -> Deps:
+        return cls(
+            site_id=site_id,
+            detection=detection,
+            window=facts.WindowData.from_window(window),
+            site=site,
+        )
 
 
 @dataclass
@@ -86,6 +112,7 @@ class RunStats:
 
 
 incident_agent = Agent(
+    name="netcortex_investigator",
     deps_type=Deps,
     output_type=IncidentReport,
     instructions=INSTRUCTIONS,
@@ -97,7 +124,7 @@ incident_agent = Agent(
 def get_metrics(ctx: RunContext[Deps], series: str, minutes: int = 15) -> dict[str, Any]:
     """Recent values of one series, e.g. 'probe:8.8.8.8:rtt_ms', 'iface:ether1:util_pct'
     or 'subscriber:10.0.0.42:rx_bps'. Returns latest, mean, min, max and up to 10 points."""
-    return facts.metric_summary(ctx.deps.window, series, minutes)
+    return facts.metric_summary(ctx.deps.metrics(), series, minutes)
 
 
 @incident_agent.tool
@@ -133,10 +160,8 @@ async def search_runbook(query: str) -> list[dict[str, Any]] | str:
     ]
 
 
-@incident_agent.tool
-async def check_news(
-    ctx: RunContext[Deps], provider: str | None = None, target: str | None = None
-) -> dict[str, Any]:
+@incident_agent.tool_plain
+async def check_news(provider: str | None = None, target: str | None = None) -> dict[str, Any]:
     """Search recent news for an outage at the upstream provider or a game server."""
     try:
         news = await asyncio.wait_for(
@@ -144,7 +169,6 @@ async def check_news(
         )
     except (ModuleUnavailable, TimeoutError) as exc:
         news = NewsCheck(available=False, summary=f"Outage check failed ({type(exc).__name__}).")
-    ctx.deps.news = news
     return news.model_dump(mode="json")
 
 
@@ -162,7 +186,7 @@ def check_fix(ctx: RunContext[Deps], report: IncidentReport) -> IncidentReport:
     observed = None
     if report.template_id is TemplateId.QUEUE_LIMIT and "target" in params:
         try:
-            observed = facts.subscriber_rates(ctx.deps.window, str(params["target"]))
+            observed = facts.subscriber_rates(ctx.deps.metrics(), str(params["target"]))
         except ValueError:
             observed = None  # not an IP; the schema check below reports it
     try:
@@ -218,6 +242,18 @@ def load_site(site_id: str) -> Site | None:
         return None
 
 
+def with_news(report: IncidentReport, messages: list[ModelMessage]) -> IncidentReport:
+    """Copy the last check_news result into the report if the model left it out."""
+    if report.upstream_check is not None:
+        return report
+    for message in reversed(messages):
+        for part in message.parts:
+            if isinstance(part, ToolReturnPart) and part.tool_name == "check_news":
+                news = NewsCheck.model_validate(part.content)
+                return report.model_copy(update={"upstream_check": news})
+    return report
+
+
 def _stats(messages: list[ModelMessage], started: float) -> RunStats:
     stats = RunStats(seconds=round(time.perf_counter() - started, 1))
     for message in messages:
@@ -242,7 +278,7 @@ async def run_investigation(
 ) -> tuple[IncidentReport, RunStats]:
     """investigate() plus run statistics; lets callers pass the site and thinking mode."""
     settings = settings or get_settings()
-    deps = Deps(site_id, detection, window, site=site)
+    deps = Deps.build(site_id, detection, window, site)
     prompt = facts.build_prompt(site_id, site, detection, window)
     started = time.perf_counter()
     with capture_run_messages() as messages:
@@ -258,9 +294,7 @@ async def run_investigation(
             stats = _stats(messages, started)
             stats.fell_back = True
             return fallback_report(detection), stats
-    report = result.output
-    if report.upstream_check is None and deps.news is not None:
-        report = report.model_copy(update={"upstream_check": deps.news})
+    report = with_news(result.output, result.all_messages())
     return report, _stats(result.all_messages(), started)
 
 

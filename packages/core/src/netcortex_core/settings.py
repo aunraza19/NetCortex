@@ -37,7 +37,13 @@ class Settings(BaseSettings):
 
     # Runtime
     temporal_address: str = "localhost:7233"
+    temporal_task_queue: str = "netcortex"
     demo_mode: bool = False
+    monitor_interval_s: float = Field(default=60.0, gt=0)  # how often each site is checked
+    approval_timeout_s: float = Field(default=7200.0, gt=0)  # then the incident is rejected
+    verify_wait_s: float = Field(default=300.0, ge=0)  # watch time after applying a fix
+    api_cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    monitor_sites: list[str] = ["home-lab", "sim-tower"]  # watched by the worker
     http_timeout_s: float = Field(default=10.0, gt=0)  # default for every outbound call
 
     # Routers. Fixes go to CHR unless APPLY_TARGET=real is set explicitly.

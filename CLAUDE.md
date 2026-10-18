@@ -32,6 +32,7 @@
 - **Fallback:** if Tailscale fails, pull the partner's code from GitHub and run everything on the laptop. The laptop reaches the Mac over the home LAN.
 - **Database:** Tiger Cloud (TimescaleDB + pgvector), shared by both people.
 - **CHR test router:** QEMU for Windows (TCG; WHPX loses the NICs) runs RouterOS 7.24.5 locally. `infra\chr\start.ps1` boots it (REST `127.0.0.1:9180`, SSH `127.0.0.1:9122`), `reset.ps1` restores the baseline. `CHR_PASSWORD` is in `.env` only. All 4 templates pass `infra/chr/test_templates.py`.
+- **Runtime (A2/A8/A9):** Temporal CLI via winget (`temporal server start-dev --db-filename var/temporal.db`, UI :8233), `uv run worker` (monitors `MONITOR_SITES`: home-lab, sim-tower), API `uv run uvicorn netcortex_api.main:app --port 8000`. Until the partner's modules merge, `packages/agent/stubs.py` provides a rule-based `detect()` and a minimal `inject()` for `sim-tower` (layout mirrors the CHR baseline).
 - **Laptop quirks:** the Fedora WSL distro is broken (missing disk), Docker Desktop is usually off, and `uv` lives in `%APPDATA%\Python\Python315\Scripts`.
 
 **Do not download large files on the laptop while the Mac model download runs.** Both share the home connection. Small Docker images and the CHR image are fine.
@@ -253,9 +254,12 @@ Also record the demo video.
 uv sync                                   # install workspace
 uv run pytest -m "not live"               # unit tests
 uv run pytest -m live                     # needs the Mac model
-temporal server start-dev                 # Temporal dev server + UI on :8233
+temporal server start-dev --db-filename var/temporal.db   # Temporal + UI on :8233
+uv run worker                             # Temporal worker (monitors + incidents)
+uv run python infra/scripts/check_ollama.py
+uv run python infra/scripts/e2e.py heavy_user             # inject -> approve -> resolved
 uv run collector                          # live collector
 bash infra/chr/start.sh                   # boot CHR
 uv run python infra/chr/test_templates.py # test all fix templates on CHR
-uv run uvicorn services.api.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn netcortex_api.main:app --host 0.0.0.0 --port 8000
 ```

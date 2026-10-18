@@ -131,3 +131,18 @@ def test_fetch_site_builds_a_site_from_the_row():
 
     site = db.fetch_site(SiteConn(), "north-tower")
     assert site.uplinks[0].iface == "ether1" and site.subscribers == 120
+
+
+def test_has_open_incident_can_include_recently_closed_ones():
+    class OneRow(FakeCursor):
+        def fetchone(self):
+            return (1,)
+
+    class Conn(FakeConn):
+        def cursor(self):
+            return OneRow(self.log)
+
+    conn = Conn()
+    assert db.has_open_incident(conn, "sim-tower", "heavy_user", NOW)
+    sql, params = conn.log[0]
+    assert "closed_at IS NULL OR closed_at > %s" in sql and params[2] == NOW
