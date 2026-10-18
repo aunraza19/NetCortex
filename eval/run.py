@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import statistics
 import time
@@ -9,9 +10,17 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from netcortex_core import (
+    Cause,
+    DetectionResult,
+    ForecastPoint,
+    MetricsWindow,
+    SeriesForecast,
+)
 from netcortex_detector.engine import (
     DetectorConfig,
     DetectorUnavailable,
+    _forecast_series_key,
     build_features,
     run_engine,
 )
@@ -82,6 +91,34 @@ def _verify_splits(
                 raise ValueError("case time windows overlap across train, validation and test")
 
 
+def _as_detection_result(result: dict[str, Any], mode: str) -> DetectionResult:
+    grouped: dict[str, list[ForecastPoint]] = {}
+    for row in result.get("forecasts", []):
+        grouped.setdefault(_forecast_series_key(str(row["metric"])), []).append(
+            ForecastPoint(
+                time=pd.Timestamp(row["target_time"]).to_pydatetime(),
+                p10=float(row["p10"]),
+                p50=float(row["p50"]),
+                p90=float(row["p90"]),
+            )
+        )
+    series = [
+        SeriesForecast(series_key=key, points=points) for key, points in sorted(grouped.items())
+    ]
+    provenance = str(result.get("provenance", ""))
+    fixture = provenance.startswith("fixture:")
+    return DetectionResult(
+        is_anomaly=bool(result["is_anomaly"]),
+        score=float(result["anomaly_score"]),
+        cause_guess=Cause(result["cause"]),
+        cause_confidence=float(result["cause_confidence"]),
+        evidence=result.get("evidence", []),
+        series=series,
+        model="fixture_persistence" if fixture else provenance,
+        mode="mock" if fixture else mode,
+    )
+
+
 def evaluate(
     cases_dir: Path,
     *,
@@ -91,7 +128,42 @@ def evaluate(
     investigator: Any | None = None,
     params_validator: Any | None = None,
     chr_checker: Any | None = None,
+    run_agent: bool = False,
+    run_chr: bool = False,
 ) -> dict[str, Any]:
+    if run_agent:
+        from netcortex_agent.agent import investigate
+        from netcortex_fixes import validate
+
+        async def investigate_case(result: dict[str, Any], case, probes, interfaces):
+            detection = _as_detection_result(result, mode)
+            window = MetricsWindow(
+                as_of=pd.Timestamp(case["as_of"]).to_pydatetime(),
+                probe_metrics=probes,
+                iface_metrics=interfaces,
+            )
+            report = await investigate(case["site_id"], detection, window)
+            return report.model_dump(mode="json")
+
+        if investigator is None:
+            investigator = investigate_case
+        if params_validator is None:
+
+            def validate_report(report):
+                validate(report["template_id"], report.get("template_params", {}))
+                return True
+
+            params_validator = validate_report
+    if run_chr:
+        from netcortex_fixes import RouterClient, dry_run
+
+        client = RouterClient.chr()
+        if chr_checker is None:
+
+            def check_on_chr(report):
+                return dry_run(report["template_id"], report.get("template_params", {}), client).ok
+
+            chr_checker = check_on_chr
     split_paths = {
         name: sorted((cases_dir / name).glob("*.json")) for name in ("train", "validation", "test")
     }
@@ -197,7 +269,13 @@ def evaluate(
         hook_error = None
         if investigator is not None and status == "ok":
             try:
-                agent_result = investigator(result)
+                agent_result = (
+                    investigator(result, case, *_load_case(path)[1:])
+                    if run_agent and investigator is not None
+                    else investigator(result)
+                )
+                if asyncio.iscoroutine(agent_result):
+                    agent_result = asyncio.run(agent_result)
             except Exception as exc:  # noqa: BLE001 - injected integration hook boundary
                 hook_error = f"investigator unavailable ({type(exc).__name__})"
         params_valid = None
@@ -222,7 +300,7 @@ def evaluate(
                 "expected_cause": case["expected"]["cause"],
                 "predicted_cause": result.get("cause"),
                 "expected_template": case["expected"].get("template_id"),
-                "agent_cause": agent_result.get("cause")
+                "agent_cause": agent_result.get("likely_cause", agent_result.get("cause"))
                 if isinstance(agent_result, dict)
                 else None,
                 "predicted_template": agent_result.get("template_id")
@@ -281,18 +359,15 @@ def evaluate(
         "chr_dry_run_pass_rate": _rate(
             [r["chr_pass"] for r in results if r["chr_pass"] is not None]
         ),
-        "template_note": "measured from injected investigator hook"
+        "template_note": "measured from investigator integration"
         if any(r["predicted_template"] is not None for r in results)
-        else "unavailable: Aun investigate/template contracts are not published",
+        else "unavailable: no investigator result was returned",
         "params_note": "measured from injected validator hook"
         if any(r["params_valid"] is not None for r in results)
-        else (
-            "unavailable: approved template schemas and observed parameter sources "
-            "are not published"
-        ),
+        else ("unavailable: no investigator parameters were returned for validation"),
         "chr_note": "measured from injected checker hook"
         if any(r["chr_pass"] is not None for r in results)
-        else "unavailable: Aun CHR checker and machine-readable result contract are not present",
+        else "unavailable: CHR dry-run was not executed or no investigator result was returned",
         "validation_score_count": len(validation_scores),
         "validation_unavailable_cases": validation_unavailable,
         "validation_normal_site_day_exposure": normal_site_days(validation_normal_windows),
@@ -379,12 +454,15 @@ def _markdown(report: dict[str, Any]) -> str:
         "",
         "## Cases",
         "",
-        "| Case | Expected cause | Predicted cause | Anomaly | Status | Seconds |",
-        "|---|---|---|---:|---|---:|",
+        "| Case | Expected cause | Detector cause | Agent cause | Template | Params valid | "
+        "CHR pass | Hook error | Anomaly | Status | Seconds |",
+        "|---|---|---|---|---|---:|---:|---|---:|---|---:|",
     ]
     lines += [
         f"| {r['case_id']} | {r['expected_cause']} | {r['predicted_cause']} | "
-        f"{r['is_anomaly']} | {r['status']} | {r['seconds']:.3f} |"
+        f"{r['agent_cause']} | {r['predicted_template']} | {r['params_valid']} | "
+        f"{r['chr_pass']} | {r['hook_error']} | {r['is_anomaly']} | {r['status']} | "
+        f"{r['seconds']:.3f} |"
         for r in report["results"]
     ]
     return "\n".join(lines) + "\n"
@@ -398,8 +476,23 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=ROOT / "eval" / "results" / "detector.md")
     parser.add_argument("--mode", choices=("mock", "cloud", "local"), default="mock")
     parser.add_argument("--limit", type=int, help="limit test cases for a fixture smoke run")
+    parser.add_argument("--with-agent", action="store_true", help="run Aun's Gemma investigator")
+    parser.add_argument(
+        "--chr-dry-run",
+        action="store_true",
+        help="apply and roll back fixes on the configured CHR",
+    )
     args = parser.parse_args()
-    report = evaluate(args.cases, mode=args.mode, out=args.out, limit=args.limit)
+    if args.chr_dry_run and not args.with_agent:
+        parser.error("--chr-dry-run requires --with-agent")
+    report = evaluate(
+        args.cases,
+        mode=args.mode,
+        out=args.out,
+        limit=args.limit,
+        run_agent=args.with_agent,
+        run_chr=args.chr_dry_run,
+    )
     print(f"Evaluated {report['available_test_cases']} available cases; report: {args.out}")
     return 0
 
