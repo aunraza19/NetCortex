@@ -1,0 +1,62 @@
+<task-notification>
+<task-id>bzjb6o9hx</task-id>
+<tool-use-id>toolu_01FHGXFTZu9hsw3J6XKN7tu2</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bzjb6o9hx.output</output-file>
+<status>completed</status>
+<summary>Background command "Second heavy_user run without CHR reset" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bbe2mly3o</task-id>
+<tool-use-id>toolu_01MfCZUWKUKqTPEqFtQZ9gc5</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bbe2mly3o.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait out cooldown, then rerun heavy_user without CHR reset" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<pasted_content id="5505">
+We're wrapping up for a clean local demo. Do all of this, then push main.
+
+1. Strip non-working features from the RUNNING system (don't delete the partner's
+   packages; they stay as unused experimental code):
+   - Agent: remove the search_runbook and check_news tools. Remove upstream_check from
+     what the model produces (keep the schema field only if removing it is risky;
+     then always null and hidden).
+   - Workflow: remove the TabPFN second-opinion step and the DETECTOR_ARTIFACT startup
+     hook. The rule-based detector is the only detector.
+   - UI: remove the "second opinion" and "upstream check" sections.
+   - Update tests; remove dead stubs. Keep CHR, Gemma, Temporal, Sentry and Tiger
+     untouched.
+2. Make VERIFY_WAIT_S default to 60 for the demo (a note in .env.example says production
+   uses 300).
+3. Add infra/scripts/start-demo.ps1: opens separate windows for the Temporal dev server
+   (var/temporal.db), CHR start, worker, API and collector (from ../NetCortex-run), skips
+   any already running (check ports 7233, 9180, 8000), then runs check_ollama.py and
+   prints the dashboard URL. Plus stop-demo.ps1. Document both in README.md
+   ("Run the demo").
+4. Restart the worker and API on the new code. Run heavy_user, uplink_down and dns_slow
+   end to end once each (wait out cooldowns; different causes don't need to wait).
+   Report the results.
+5. Update docs/post/post.md:
+   - Remove all mentions of SerpApi, runbook search, EmbeddingGemma, pgvector and the
+     TabPFN second opinion as features. In "Honest limits" / "What's next", one line:
+     "We built TabPFN forecasting and docs search but cut them before the deadline;
+     they weren't reliable enough."
+   - Check "home internet gets slow in the evening" against our collector data (median
+     and p95 RTT to 1.1.1.1 and 8.8.8.8, evening 19:00-01:00 PKT vs other hours). Use the
+     numbers if they support it; otherwise soften. Show me the numbers.
+   - Add a short "Where open beat closed" paragraph: a cloud LLM API would see subscriber
+     IPs, traffic and router config, would be unreachable during the uplink outage it is
+     meant to diagnose, and bills per token. Say we did not benchmark a closed model.
+   - Add the results of today's runs from step 4. Tighten the post by ~15% without
+     losing numbers. Built with: Gemma 4, Temporal, Sentry, Tiger Data, GitHub Actions,
+     Entire.
+   - Entire: give me 2 checkpoint session links to include (the agent build, and the
+     fix-rollback bug), or tell me if they aren't public.
+6. Final check: tests and ruff pass, git status is clean, main is pushed. Give me a
+   short "how to run the demo" summary.
+</pasted_content id="5505">
