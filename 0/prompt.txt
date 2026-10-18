@@ -1,0 +1,22 @@
+waht avbout the branhch review jsut give me that
+
+---
+
+<pasted_content id="5505">
+Decisions:
+- Live demo keeps our rule-based detect() and our sim-tower inject() stand-ins.
+- Small PR (a/module-gating): in modules.py, switch to the partner's detect() only after
+  configure_detector() succeeds, and use his inject() only for sites he knows; sim-tower
+  always uses our stand-in.
+- In the same PR: when an incident opens, call the partner's TabPFN detect() once as an
+  enrichment step (timeout 150 s). If it returns, give its cause_guess, score and forecast
+  series to the agent as extra evidence and store them with the report. If it fails or
+  times out, continue without it. Rules stay the trigger.
+First, verify trace 1ffec8847bc44c8f89a8b0b66a04e4f3 via the Sentry MCP (gen_ai spans with
+token counts present, stray detect span gone). If good, tell me so I can merge a/sentry-genai,
+then do a/module-gating on top of main. Push and give me the compare URL.
+</pasted_content id="5505">
+
+---
+
+merge doen on a/setnry genai please check agian
