@@ -1,0 +1,50 @@
+[project]
+name = "netcortex-workspace"
+version = "0.1.0"
+description = "NetCortex development workspace"
+requires-python = ">=3.14,<3.15"
+# Workspace packages installed by a plain `uv sync`. Add each new member here.
+dependencies = ["netcortex-core"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-cov>=6,<7",
+    "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+# Globs, so this works before and after Workstream B's packages land.
+members = ["packages/*", "services/*"]
+
+[tool.uv.sources]
+netcortex-core = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["packages"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+# Globs that match nothing are skipped, so missing folders don't break a run.
+testpaths = ["packages/*/tests", "services/*/tests", "infra/*/tests", ".github/tests"]
+addopts = "--strict-markers --strict-config"
+markers = [
+    "live: needs real services (the Mac model server, Tiger Cloud, CHR); deselect with -m 'not live'",
+]
+
+[tool.coverage.run]
+branch = true
+source = [
+    "netcortex_core",
+    "netcortex_simgen",
+    "netcortex_detector",
+    "netcortex_runbook",
+    "netcortex_notify",
+]
