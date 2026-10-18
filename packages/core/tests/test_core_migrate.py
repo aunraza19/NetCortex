@@ -1,5 +1,4 @@
 import re
-import secrets
 from contextlib import nullcontext
 
 import psycopg
@@ -88,8 +87,8 @@ def test_missing_database_url_exits_with_a_message(monkeypatch, capsys):
 
 
 def test_connection_errors_never_print_the_url_or_password(monkeypatch, capsys):
-    password = secrets.token_hex(8)  # generated, so no credential-like literal is committed
-    url = f"postgresql://tester:{password}@db.invalid:5432/tsdb"
+    password = "not-a-real-password"
+    url = f"postgresql://tester:{password}@db.example.invalid:5432/tsdb"  # reserved, fake domain
     monkeypatch.setattr(migrate, "get_settings", lambda: Settings(_env_file=None, database_url=url))
 
     def refuse(conninfo, **kwargs):

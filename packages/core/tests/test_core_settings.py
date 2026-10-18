@@ -1,5 +1,3 @@
-import secrets
-
 import pytest
 from netcortex_core import Settings
 from pydantic import ValidationError
@@ -54,8 +52,8 @@ def test_apply_target_only_accepts_chr_or_real(monkeypatch):
 
 
 def test_secrets_are_masked_when_printed(monkeypatch):
-    password = secrets.token_hex(8)
-    monkeypatch.setenv("DATABASE_URL", f"postgresql://tester:{password}@db.invalid:5432/tsdb")
+    password = "not-a-real-password"
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://tester:{password}@db.example.invalid/tsdb")
     settings = make()
     assert password not in repr(settings) and password not in str(settings)
     assert settings.database_url.get_secret_value().endswith("/tsdb")
