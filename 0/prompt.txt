@@ -1,0 +1,37 @@
+<pasted_content id="5505">
+a/chr is merged. Pull main and branch a/runtime. Do A2 + A8 + A9 + A10 from CLAUDE.md.
+
+- A2: Temporal dev server on this laptop (temporal CLI start-dev is fine). Add
+  infra/scripts/check_ollama.py.
+
+- Stand-ins until the partner's modules merge (they switch to his real ones automatically,
+  like the agent stubs):
+  - detect(): a simple rule-based detector (e.g. loss above a threshold, or RTT far above
+    the recent median, or a heavy subscriber), mode="mock", with the same DetectionResult
+    contract.
+  - inject(): a minimal injector that writes source=sim rows plus a scenario_labels row
+    for heavy_user, uplink_down and dns_slow on a sim site.
+
+- A8: MonitorSiteWorkflow and IncidentWorkflow as in CLAUDE.md (voice step removed):
+  investigate with TemporalAgent -> check_fix (dry run on CHR) -> awaiting_approval ->
+  approve/reject signal (2 h timeout) -> apply -> watch 5 min -> verify -> resolved or
+  rolled_back. Write events rows on every status change. A failed partner call never
+  kills a workflow.
+
+- A9: FastAPI with the plan section 8 endpoints, minus /voice. SSE from
+  LISTEN netcortex_events. Approve/reject send Temporal signals. CORS for local dev.
+  DEMO_MODE serves saved reports and needs no agent.
+
+- A10: Sentry tracing in the API and workers. SENTRY_DSN_BACKEND is in .env; read it
+  via Settings only. Use the Pydantic AI integration plus manual spans for detect,
+  check_fix and apply. After the end-to-end runs, use the Sentry MCP to confirm the
+  traces arrived in project netcortex-backend, and list the trace IDs or links of the
+  best ones for screenshots.
+
+- End-to-end test on the real stack: inject heavy_user -> incident opens -> agent report
+  -> CHR dry run passes -> approve via API -> apply on CHR -> verify -> resolved.
+  Then do uplink_down and dns_slow. Report what happened at each step and the timings.
+
+Rules: don't touch Workstream B folders, don't read .env, small commits.
+Plan briefly, then build. Push and give me the compare URL.
+</pasted_content id="5505">
