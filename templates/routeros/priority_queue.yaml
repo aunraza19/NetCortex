@@ -1,6 +1,6 @@
 id: priority_queue
 description: Give DNS and game traffic priority over bulk traffic on a congested uplink.
-status: untested on CHR
+status: tested on CHR (RouterOS 7.24.5)
 allowed_causes: [uplink_congestion]
 params:
   uplink:

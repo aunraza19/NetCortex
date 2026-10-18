@@ -10,12 +10,12 @@ VALID = {
 }
 
 
-def test_every_template_loads_and_is_marked_untested():
+def test_every_template_loads_and_has_passed_chr():
     templates = load_templates()
     assert set(templates) == set(TemplateId)
     for template_id, template in templates.items():
         if template_id is not TemplateId.NONE:
-            assert template.status == "untested on CHR"
+            assert template.status.startswith("tested on CHR")
             assert template.apply and template.rollback and template.verify
 
 

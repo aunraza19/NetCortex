@@ -75,7 +75,9 @@ class RouterStats:
 
     def __init__(self, base_url: str, username: str, password: str, timeout_s: float) -> None:
         self._client = httpx.AsyncClient(
-            base_url=base_url.rstrip("/"), auth=(username, password), timeout=timeout_s
+            base_url=base_url.rstrip("/").removesuffix("/rest"),
+            auth=(username, password),
+            timeout=timeout_s,
         )
         self._interfaces = DeltaTracker()
         self._queues = DeltaTracker()
