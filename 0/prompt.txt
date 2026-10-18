@@ -1,0 +1,23 @@
+<pasted_content id="5505">
+Stop the background e2e runs. Time is short; the partner is gone, I own everything now.
+
+STEP 1: Merge to main (you do the merges and push main; run tests before each push):
+a) Merge a/demo-hardening into main.
+b) Partner branch origin/b/workstream-b: merge it into main ONLY if, after the merge,
+   uv sync --all-packages, uv run pytest -m "not live" and ruff check pass, and our module
+   gating still keeps the rule-based trigger and the sim-tower stand-in. If it fails or
+   needs more than ~15 minutes of fixing, skip it and tell me why. Don't fix his code
+   beyond trivial conflicts.
+c) Delete apps/web if it got merged in. We're replacing it.
+
+STEP 2: Minimal local UI, served by our FastAPI at http://localhost:8000/
+- One static HTML file + plain CSS + vanilla JS, in services/api (no Node, no framework,
+  no CDN; works offline).
+- Look: monochrome. Black, white and grays only, system font, thin 1px borders, generous
+  spacing, no gradients, shadows, emoji or icons, no "AI-looking" cards. Status shown as
+  plain text labels (OPEN, AWAITING APPROVAL, RESOLVED, ROLLED BACK). Monospace for
+  commands. Works at phone width.
+- Layout:
+  - Top bar: "NetCortex", site health per site (name + status + latest latency).
+  - "Simulate incident":
+</pasted_content id="5505">
