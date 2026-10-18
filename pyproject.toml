@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "NetCortex development workspace"
 requires-python = ">=3.12,<3.13"
 # Workspace packages installed by a plain `uv sync`. Add each new member here.
-dependencies = ["netcortex-core", "netcortex-collector", "netcortex-fixes", "netcortex-agent"]
+dependencies = ["netcortex-core", "netcortex-collector", "netcortex-fixes", "netcortex-agent", "netcortex-worker", "netcortex-api"]
 
 [dependency-groups]
 dev = [
@@ -25,6 +25,8 @@ netcortex-core = { workspace = true }
 netcortex-collector = { workspace = true }
 netcortex-fixes = { workspace = true }
 netcortex-agent = { workspace = true }
+netcortex-worker = { workspace = true }
+netcortex-api = { workspace = true }
 
 [tool.ruff]
 line-length = 100

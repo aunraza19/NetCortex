@@ -10,4 +10,14 @@ try:
 except ImportError:
     from netcortex_agent.stubs import check_news
 
-__all__ = ["check_news", "search_runbook"]
+try:
+    from netcortex_detector import detect
+except ImportError:
+    from netcortex_agent.stubs import detect
+
+try:
+    from netcortex_simgen import inject
+except ImportError:
+    from netcortex_agent.stubs import inject
+
+__all__ = ["check_news", "detect", "inject", "search_runbook"]

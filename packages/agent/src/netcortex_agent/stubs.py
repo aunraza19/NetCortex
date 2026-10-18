@@ -4,6 +4,11 @@ netcortex_core.interfaces, so `modules.py` can switch to the real ones automatic
 
 from netcortex_core import NewsCheck, RunbookChunk
 
+from netcortex_agent.stub_detector import detect
+from netcortex_agent.stub_injector import inject
+
+__all__ = ["check_news", "detect", "inject", "search_runbook"]
+
 # A few short pointers into the RouterOS docs, keyed by topic, until packages/runbook lands.
 _RUNBOOK = {
     ("queue", "limit", "bandwidth", "subscriber", "heavy"): RunbookChunk(
