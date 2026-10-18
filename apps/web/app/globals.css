@@ -464,6 +464,9 @@ select:focus-visible {
   background: #ec7177;
   box-shadow: 0 0 8px #ec717755;
 }
+.health-unknown {
+  background: #74838d;
+}
 .site-health-label {
   font-size: 10px;
   color: #9eacb3;
@@ -881,6 +884,22 @@ select:focus-visible {
   line-height: 1.7;
   color: #c5d1d5;
   margin: 19px 0;
+}
+.customer-messages {
+  border-top: 1px solid #27343d;
+  margin-top: 18px;
+  padding-top: 14px;
+}
+.customer-messages h3 {
+  color: #a9bac2;
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.customer-messages p {
+  color: #d3dfe3;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 8px 0;
 }
 .evidence-block {
   border-top: 1px solid #283740;

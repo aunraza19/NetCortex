@@ -24,3 +24,12 @@ sites:
     backup_uplink: {interface: ether2, role: backup, capacity_mbps: 100}
     backhauls: [{interface: wlan1, role: backhaul, capacity_mbps: 150}, {interface: wlan2, role: backhaul, capacity_mbps: 100}]
     targets: [gateway, upstream-hop, 1.1.1.1, 8.8.8.8, regional-game]
+  - id: sim-tower
+    name: Sim Tower (simulated)
+    runtime_only: true
+    subscribers: 3
+    uplinks:
+      - {interface: ether1, role: primary, capacity_mbps: 180, gateway: 10.0.2.2}
+    backup_uplink: {interface: ether2, role: backup, capacity_mbps: 80, gateway: 192.0.2.1}
+    backhauls: []
+    targets: [10.0.0.1, 1.1.1.1, 8.8.8.8, dns:192.0.2.53, dns:1.1.1.1]

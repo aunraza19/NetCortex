@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:api": "playwright test --config=playwright.api.config.ts",
     "test:e2e:live": "playwright test --config=playwright.live.config.ts",
     "api:types": "node scripts/generate-openapi-types.mjs",
     "format": "prettier --write **/*.{ts,tsx,js,mjs,json,css,md}",

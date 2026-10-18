@@ -392,18 +392,30 @@ def test_walk_forward_rule_needs_three_actual_exceedances():
 
 def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
     from contextlib import nullcontext
+    from threading import Lock
+    from time import sleep
 
     from netcortex_detector.providers import TabPFNBackend
 
-    calls = {"reg_fit": 0, "predict": 0, "clf_fit": 0, "unsup_fit": 0}
+    calls = {"reg_fit": 0, "predict": 0, "clf_fit": 0, "unsup_fit": 0, "outliers": 0}
     regression_fit_rows = []
+    concurrency = {"active": 0, "max_active": 0}
+    concurrency_lock = Lock()
 
     class FakeRegressor:
         def fit(self, x, y):
-            calls["reg_fit"] += 1
+            with concurrency_lock:
+                calls["reg_fit"] += 1
+                concurrency["active"] += 1
+                concurrency["max_active"] = max(
+                    concurrency["max_active"], concurrency["active"]
+                )
             assert x.shape[1] > 1
             regression_fit_rows.append(x.copy())
             self.columns = x.shape[1]
+            sleep(0.02)
+            with concurrency_lock:
+                concurrency["active"] -= 1
 
         def predict(self, x, *, output_type, quantiles):
             calls["predict"] += 1
@@ -431,6 +443,7 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
 
         def outliers(self, x, *, n_permutations):
             assert n_permutations == 1
+            calls["outliers"] += 1
             return np.linspace(-1.0, -2.0, len(x))
 
     class Backend(TabPFNBackend):
@@ -462,6 +475,7 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
     features = build_features(p, i, site_id="s1", as_of=p.time.max())
     forecast = backend.forecasts(features, 5)
     assert forecast
+    assert concurrency["max_active"] <= 8
     assert all(row["p10"] <= row["p50"] <= row["p90"] for row in forecast)
     by_horizon = {
         row["horizon_minutes"]: row for row in forecast if row["metric"].startswith("rtt_ms_")
@@ -486,10 +500,12 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
     assert calls["unsup_fit"] == 1
     assert "rtt_ms_constant" not in backend._anomaly_columns
     assert all(normal[column].nunique() > 1 for column in backend._anomaly_columns)
-    reference = [backend.raw_anomaly(normal.iloc[index]) for index in range(3)]
+    reference = backend.raw_anomaly_batch([normal.iloc[index] for index in range(3)])
+    assert reference == [-1.0, -1.5, -2.0]
+    assert calls["outliers"] == 1
     backend.set_anomaly_reference(reference)
     assert 0.0 <= backend.anomaly(features.iloc[-1]) <= 1.0
-    assert seeded_values == [73021] * 4
+    assert seeded_values == [73021] * 2
 
     large_p, large_i = frames(minutes=600)
     large = build_features(large_p, large_i, site_id="s1", as_of=large_p.time.max())
@@ -497,6 +513,167 @@ def test_tabpfn_adapter_fits_lagged_forecasts_and_joint_quantiles(monkeypatch):
     latest_fit = regression_fit_rows[-1]
     assert len(latest_fit) <= 2048
     assert set(latest_fit[:, -1].astype(int)) == {1, 2, 3, 4, 5}
+
+
+def test_forecast_processes_all_twelve_metrics_with_bounded_parallelism(monkeypatch):
+    from threading import Lock
+    from time import sleep
+
+    from netcortex_detector.providers import MAX_PARALLEL_FORECASTS, TabPFNBackend
+
+    active = 0
+    peak = 0
+    guard = Lock()
+    fitted = []
+
+    class FakeModel:
+        def fit(self, x, y):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            sleep(0.01)
+            fitted.append(len(y))
+            with guard:
+                active -= 1
+
+        def predict(self, x, *, output_type, quantiles):
+            assert output_type == "quantiles" and quantiles == [0.1, 0.5, 0.9]
+            values = np.ones(len(x), dtype=float)
+            return [values, values * 2, values * 3]
+
+    backend = TabPFNBackend("local")
+    monkeypatch.setattr(backend, "_imports", lambda: (FakeModel, FakeModel))
+    monkeypatch.setattr(backend, "_new_model", lambda _kind: FakeModel())
+    history = pd.DataFrame(
+        {
+            "minute_of_day": np.arange(20, dtype=float),
+            **{
+                f"rtt_ms_target:{position}": np.arange(20, dtype=float) + position
+                for position in range(12)
+            },
+        },
+        index=pd.date_range("2026-01-01", periods=20, freq="min", tz="UTC"),
+    )
+
+    forecasts = backend.forecasts(history, 5)
+
+    assert len(forecasts) == 12 * 5
+    assert {row["metric"] for row in forecasts} == {
+        f"rtt_ms_target:{position}" for position in range(12)
+    }
+    assert len(fitted) == 12
+    assert 2 <= peak <= MAX_PARALLEL_FORECASTS
+    assert len(backend._model_locks) == 64
+
+
+def test_forecast_walltime_budget_cancels_queued_metric_work(monkeypatch):
+    from time import sleep
+
+    from netcortex_detector import providers
+
+    monkeypatch.setattr(providers, "FORECAST_INFERENCE_BUDGET_SECONDS", 0.005)
+    backend = providers.TabPFNBackend("local")
+    monkeypatch.setattr(backend, "_imports", lambda: (object, object))
+    started = []
+
+    def slow_forecast(_numeric, _training, _predictors, _origin, metric, _horizon):
+        started.append(metric)
+        sleep(0.05)
+        return []
+
+    monkeypatch.setattr(backend, "_forecast_metric", slow_forecast)
+    history = pd.DataFrame(
+        {
+            "minute_of_day": np.arange(20, dtype=float),
+            **{
+                f"rtt_ms_target:{position}": np.arange(20, dtype=float) + position
+                for position in range(12)
+            },
+        },
+        index=pd.date_range("2026-01-01", periods=20, freq="min", tz="UTC"),
+    )
+
+    with pytest.raises(DetectorUnavailable, match="wall-time budget"):
+        backend.forecasts(history, 5)
+    assert len(started) < 12
+
+
+def test_tabpfn_walk_forward_batch_matches_sequential_across_bucket(monkeypatch):
+    from netcortex_detector.providers import TabPFNBackend
+
+    predicted_batches = []
+
+    class FakeModel:
+        def fit(self, _x, _y):
+            pass
+
+        def predict(self, x, *, output_type, quantiles):
+            assert output_type == "quantiles" and quantiles == [0.1, 0.5, 0.9]
+            predicted_batches.append(len(x))
+            medians = x[:, 0]
+            return [medians - 1, medians, medians + 1]
+
+    backend = TabPFNBackend("local")
+    monkeypatch.setattr(backend, "_imports", lambda: (FakeModel, FakeModel))
+    monkeypatch.setattr(backend, "_new_model", lambda _kind: FakeModel())
+    times = pd.date_range("2026-01-01 14:00", periods=100, freq="min", tz="UTC")
+    features = pd.DataFrame(
+        {
+            "minute_of_day": np.arange(100, dtype=float),
+            "rtt_ms_target:one": np.arange(100, dtype=float) + 20,
+            "rtt_ms_target:one_lag1": np.arange(100, dtype=float) + 19,
+        },
+        index=times,
+    )
+    target_times = [
+        pd.Timestamp("2026-01-01 15:00", tz="UTC"),
+        pd.Timestamp("2026-01-01 15:01", tz="UTC"),
+        pd.Timestamp("2026-01-01 15:02", tz="UTC"),
+    ]
+    contexts = [
+        (features.loc[features.index < target].tail(80), target) for target in target_times
+    ]
+    sequential = [backend.forecasts(history, 1) for history, _ in contexts]
+    predicted_batches.clear()
+
+    batched = backend.walk_forward_forecasts(contexts)
+
+    assert batched == sequential
+    assert sorted(predicted_batches) == [1, 2]
+    for (history, target), result in zip(contexts, batched, strict=True):
+        assert all(pd.Timestamp(row["made_at"]) < target for row in result)
+        assert all(pd.Timestamp(row["target_time"]) == target for row in result)
+        assert history.index.max() < target
+
+
+def test_tabpfn_walk_forward_batch_fails_closed_on_group_error(monkeypatch):
+    from netcortex_detector.providers import TabPFNBackend
+
+    class BrokenModel:
+        def fit(self, _x, _y):
+            pass
+
+        def predict(self, _x, *, output_type, quantiles):
+            raise RuntimeError("synthetic provider failure")
+
+    backend = TabPFNBackend("local")
+    monkeypatch.setattr(backend, "_imports", lambda: (BrokenModel, BrokenModel))
+    monkeypatch.setattr(backend, "_new_model", lambda _kind: BrokenModel())
+    times = pd.date_range("2026-01-01", periods=40, freq="min", tz="UTC")
+    features = pd.DataFrame(
+        {
+            "minute_of_day": np.arange(40, dtype=float),
+            "rtt_ms_target:one": np.arange(40, dtype=float) + 20,
+            "rtt_ms_target:one_lag1": np.arange(40, dtype=float) + 19,
+        },
+        index=times,
+    )
+    target = times[-1] + pd.Timedelta(minutes=1)
+    history = features.loc[features.index < target].tail(30)
+
+    with pytest.raises(DetectorUnavailable, match="walk-forward quantile prediction failed"):
+        backend.walk_forward_forecasts([(history, target)])
 
 
 def test_cloud_adapter_pins_timeout_and_version_without_logging_token(monkeypatch):

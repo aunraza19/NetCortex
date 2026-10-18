@@ -4,6 +4,8 @@ import os
 import random
 import sys
 import warnings
+from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Any
 
@@ -17,6 +19,8 @@ LAG_PREFIXES = ("rtt_ms_", "jitter_ms_", "loss_pct_", "iface_")
 DERIVED_SUFFIXES = ("_lag1", "_mean5", "_std5")
 MAX_TRAINING_ROWS = 2048
 ANOMALY_PERMUTATION_SEED = 73021
+MAX_PARALLEL_FORECASTS = 8
+FORECAST_INFERENCE_BUDGET_SECONDS = 90.0
 _ANOMALY_PERMUTATION_LOCK = Lock()
 
 
@@ -152,6 +156,8 @@ def _first(vector: pd.Series, prefix: str) -> float:
 class TabPFNBackend:
     """Cloud or local TabPFN 3.5 adapters with bounded inputs and cached fits."""
 
+    supports_parallel_inference = True
+
     def __init__(self, mode: str, *, access_token: str | None = None, timeout_s: float = 30.0):
         if mode not in {"cloud", "local"}:
             raise ValueError("mode must be cloud or local")
@@ -160,6 +166,8 @@ class TabPFNBackend:
         self.timeout_s = timeout_s
         self.provenance = f"tabpfn-{mode}:v3.5"
         self._models: dict[tuple[str, str], Any] = {}
+        self._model_registry_lock = Lock()
+        self._model_locks = tuple(Lock() for _ in range(64))
         self._model_classes: tuple[Any, Any] | None = None
         self._unsupervised: Any | None = None
         self._anomaly_columns: list[str] = []
@@ -199,6 +207,10 @@ class TabPFNBackend:
                 f"TabPFN {self.mode} dependencies/model unavailable ({type(exc).__name__})"
             ) from exc
 
+    def prepare_parallel_inference(self) -> None:
+        """Resolve SDK factories before worker threads begin provider operations."""
+        self._imports()
+
     def _new_model(self, kind: str) -> Any:
         classes = self._imports()
         model_class = classes[0 if kind == "classifier" else 1]
@@ -213,22 +225,29 @@ class TabPFNBackend:
         )
 
     def _cache_model(self, key: tuple[str, str], model: Any) -> None:
-        if key not in self._models and len(self._models) >= 128:
-            self._models.pop(next(iter(self._models)))
-        self._models[key] = model
+        with self._model_registry_lock:
+            if key not in self._models and len(self._models) >= 128:
+                self._models.pop(next(iter(self._models)))
+            self._models[key] = model
+
+    def _model_lock(self, key: tuple[str, str]) -> Lock:
+        return self._model_locks[hash(key) % len(self._model_locks)]
 
     def _classifier(self, x: np.ndarray, y: np.ndarray) -> Any:
         key = ("classifier", fingerprint(pd.DataFrame(np.column_stack((x, y)))))
-        if key not in self._models:
-            model = self._new_model("classifier")
-            try:
-                model.fit(x, y)
-            except Exception as exc:
-                raise DetectorUnavailable(
-                    f"TabPFN classifier fit failed ({type(exc).__name__})"
-                ) from exc
-            self._cache_model(key, model)
-        return self._models[key]
+        with self._model_lock(key):
+            with self._model_registry_lock:
+                model = self._models.get(key)
+            if model is None:
+                model = self._new_model("classifier")
+                try:
+                    model.fit(x, y)
+                except Exception as exc:
+                    raise DetectorUnavailable(
+                        f"TabPFN classifier fit failed ({type(exc).__name__})"
+                    ) from exc
+                self._cache_model(key, model)
+            return model
 
     def fit_cause_model(self, features: pd.DataFrame, labels: list[str]) -> str:
         if len(features) != len(labels) or not labels:
@@ -280,29 +299,220 @@ class TabPFNBackend:
         predictors = self._predictor_columns(numeric)
         if len(numeric) < 8 or not predictors:
             return []
+        # Resolve provider classes before worker threads start; several SDKs keep
+        # process-global configuration during their first import/factory call.
+        self._imports()
         rows: list[dict[str, Any]] = []
         origin = pd.Timestamp(numeric.index.max())
         # Reuse a frozen training context for the current 15-minute bucket.
         training = numeric.loc[numeric.index < origin.floor("15min")]
         if len(training) < 8:
             training = numeric.iloc[:-3]
-        for metric in raw_metrics:
-            x_parts, y_parts = [], []
-            for step in range(1, 6):
-                x = training[predictors].iloc[:-step].copy()
-                x["forecast_horizon"] = step
-                y = training[metric].shift(-step).iloc[:-step]
-                valid = y.notna()
-                x_parts.append(x.loc[valid])
-                y_parts.append(y.loc[valid])
-            train_x, train_y = _bounded_horizon_rows(x_parts, y_parts, MAX_TRAINING_ROWS)
-            if len(train_x) < 8 or np.ptp(train_y) <= 1e-12:
-                continue
-            key = (
-                f"regressor:{metric}",
-                fingerprint(pd.concat([train_x, pd.Series(train_y)], axis=1)),
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL_FORECASTS) as executor:
+            futures = {
+                metric: executor.submit(
+                    self._forecast_metric,
+                    numeric,
+                    training,
+                    predictors,
+                    origin,
+                    metric,
+                    horizon,
+                )
+                for metric in raw_metrics
+            }
+            completed = {}
+            try:
+                for future in as_completed(
+                    futures.values(), timeout=FORECAST_INFERENCE_BUDGET_SECONDS
+                ):
+                    completed[future] = future.result()
+            except TimeoutError as exc:
+                for future in futures.values():
+                    future.cancel()
+                raise DetectorUnavailable(
+                    "forecast inference exceeded its "
+                    f"{FORECAST_INFERENCE_BUDGET_SECONDS:g}-second wall-time budget"
+                ) from exc
+            except Exception:
+                for future in futures.values():
+                    future.cancel()
+                raise
+            for metric in raw_metrics:
+                rows.extend(completed[futures[metric]])
+        return rows
+
+    def walk_forward_forecasts(
+        self, contexts: Sequence[tuple[pd.DataFrame, pd.Timestamp]]
+    ) -> list[list[dict[str, Any]]]:
+        """Batch prior-only one-step queries sharing identical TRAIN contexts."""
+        if not contexts:
+            return []
+        self._imports()
+        prepared: list[dict[str, Any]] = []
+        for history, target_time in contexts:
+            numeric = history.select_dtypes(include=["number"]).tail(2048)
+            predictors = self._predictor_columns(numeric)
+            origin = pd.Timestamp(numeric.index.max())
+            training = numeric.loc[numeric.index < origin.floor("15min")]
+            if len(training) < 8:
+                training = numeric.iloc[:-3]
+            query = numeric[predictors].iloc[[-1]].assign(forecast_horizon=1)
+            prepared.append(
+                {
+                    "numeric": numeric,
+                    "training": training,
+                    "predictors": predictors,
+                    "origin": origin,
+                    "target_time": pd.Timestamp(target_time),
+                    "query": query,
+                    "rows": [],
+                }
             )
-            model = self._models.get(key)
+
+        groups: dict[tuple[str, str], list[tuple[int, pd.DataFrame, np.ndarray]]] = {}
+        metrics = [
+            name
+            for name in prepared[0]["numeric"]
+            if name.startswith(RAW_METRIC_PREFIXES) and not name.endswith(DERIVED_SUFFIXES)
+        ]
+        for context_index, context in enumerate(prepared):
+            for metric in metrics:
+                train_x, train_y = self._forecast_training(
+                    context["training"], context["predictors"], metric
+                )
+                if len(train_x) < 8 or np.ptp(train_y) <= 1e-12:
+                    continue
+                key = (
+                    f"regressor:{metric}",
+                    fingerprint(pd.concat([train_x, pd.Series(train_y)], axis=1)),
+                )
+                groups.setdefault(key, []).append((context_index, train_x, train_y))
+
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL_FORECASTS) as executor:
+            futures = {
+                executor.submit(
+                    self._predict_walk_forward_group,
+                    key,
+                    group,
+                    prepared,
+                ): key
+                for key, group in groups.items()
+            }
+            try:
+                for future in as_completed(
+                    futures, timeout=FORECAST_INFERENCE_BUDGET_SECONDS
+                ):
+                    future.result()
+            except TimeoutError as exc:
+                for future in futures:
+                    future.cancel()
+                raise DetectorUnavailable(
+                    "walk-forward forecast batch exceeded its "
+                    f"{FORECAST_INFERENCE_BUDGET_SECONDS:g}-second wall-time budget"
+                ) from exc
+            except Exception:
+                for future in futures:
+                    future.cancel()
+                raise
+        for context in prepared:
+            context["rows"].sort(key=lambda row: row["metric"])
+        return [context["rows"] for context in prepared]
+
+    @staticmethod
+    def _forecast_training(
+        training: pd.DataFrame, predictors: list[str], metric: str
+    ) -> tuple[pd.DataFrame, np.ndarray]:
+        x_parts, y_parts = [], []
+        for step in range(1, 6):
+            x = training[predictors].iloc[:-step].copy()
+            x["forecast_horizon"] = step
+            y = training[metric].shift(-step).iloc[:-step]
+            valid = y.notna()
+            x_parts.append(x.loc[valid])
+            y_parts.append(y.loc[valid])
+        return _bounded_horizon_rows(x_parts, y_parts, MAX_TRAINING_ROWS)
+
+    def _predict_walk_forward_group(
+        self,
+        key: tuple[str, str],
+        group: list[tuple[int, pd.DataFrame, np.ndarray]],
+        contexts: list[dict[str, Any]],
+    ) -> None:
+        metric = key[0].removeprefix("regressor:")
+        train_x, train_y = group[0][1], group[0][2]
+        with self._model_lock(key):
+            with self._model_registry_lock:
+                model = self._models.get(key)
+            if model is None:
+                model = self._new_model("regressor")
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        model.fit(_array(train_x), train_y)
+                except Exception as exc:
+                    raise DetectorUnavailable(
+                        f"TabPFN regressor fit failed ({type(exc).__name__})"
+                    ) from exc
+                self._cache_model(key, model)
+            queries = np.concatenate(
+                [_array(contexts[index]["query"]) for index, _, _ in group], axis=0
+            )
+            try:
+                response = model.predict(
+                    queries, output_type="quantiles", quantiles=[0.1, 0.5, 0.9]
+                )
+                predictions = _quantile_matrix(response, len(group))
+            except Exception as exc:
+                raise DetectorUnavailable(
+                    f"TabPFN walk-forward quantile prediction failed ({type(exc).__name__})"
+                ) from exc
+        for (context_index, _, _), quantiles in zip(group, predictions, strict=True):
+            context = contexts[context_index]
+            low, median, high = (float(value) for value in quantiles)
+            _validate_forecast_values(metric, low, median, high, 1)
+            if context["origin"] >= context["target_time"]:
+                raise DetectorUnavailable("walk-forward query includes its target observation")
+            context["rows"].append(
+                {
+                    "metric": metric,
+                    "made_at": context["origin"].isoformat(),
+                    "target_time": context["target_time"].isoformat(),
+                    "horizon_minutes": 1,
+                    "p10": low,
+                    "p50": median,
+                    "p90": high,
+                    "model": self.provenance,
+                }
+            )
+
+    def _forecast_metric(
+        self,
+        numeric: pd.DataFrame,
+        training: pd.DataFrame,
+        predictors: list[str],
+        origin: pd.Timestamp,
+        metric: str,
+        horizon: int,
+    ) -> list[dict[str, Any]]:
+        x_parts, y_parts = [], []
+        for step in range(1, 6):
+            x = training[predictors].iloc[:-step].copy()
+            x["forecast_horizon"] = step
+            y = training[metric].shift(-step).iloc[:-step]
+            valid = y.notna()
+            x_parts.append(x.loc[valid])
+            y_parts.append(y.loc[valid])
+        train_x, train_y = _bounded_horizon_rows(x_parts, y_parts, MAX_TRAINING_ROWS)
+        if len(train_x) < 8 or np.ptp(train_y) <= 1e-12:
+            return []
+        key = (
+            f"regressor:{metric}",
+            fingerprint(pd.concat([train_x, pd.Series(train_y)], axis=1)),
+        )
+        with self._model_lock(key):
+            with self._model_registry_lock:
+                model = self._models.get(key)
             if model is None:
                 model = self._new_model("regressor")
                 try:
@@ -330,23 +540,24 @@ class TabPFNBackend:
                 raise DetectorUnavailable(
                     f"TabPFN quantile prediction failed ({type(exc).__name__})"
                 ) from exc
-            for offset, quantiles in enumerate(pred, start=1):
-                lo, mid, hi = (float(value) for value in quantiles)
-                _validate_forecast_values(metric, lo, mid, hi, offset)
-                rows.append(
-                    {
-                        "metric": metric,
-                        "made_at": origin.isoformat(),
-                        "target_time": (
-                            origin.floor("min") + pd.Timedelta(minutes=offset)
-                        ).isoformat(),
-                        "horizon_minutes": offset,
-                        "p10": lo,
-                        "p50": mid,
-                        "p90": hi,
-                        "model": self.provenance,
-                    }
-                )
+        rows = []
+        for offset, quantiles in enumerate(pred, start=1):
+            lo, mid, hi = (float(value) for value in quantiles)
+            _validate_forecast_values(metric, lo, mid, hi, offset)
+            rows.append(
+                {
+                    "metric": metric,
+                    "made_at": origin.isoformat(),
+                    "target_time": (
+                        origin.floor("min") + pd.Timedelta(minutes=offset)
+                    ).isoformat(),
+                    "horizon_minutes": offset,
+                    "p10": lo,
+                    "p50": mid,
+                    "p90": hi,
+                    "model": self.provenance,
+                }
+            )
         return rows
 
     def fit_anomaly(self, normal_training_features: pd.DataFrame) -> None:
@@ -385,15 +596,25 @@ class TabPFNBackend:
             raise DetectorUnavailable(f"TabPFN anomaly fit failed ({type(exc).__name__})") from exc
 
     def raw_anomaly(self, vector: pd.Series) -> float:
+        return self.raw_anomaly_batch([vector])[0]
+
+    def raw_anomaly_batch(self, vectors: Sequence[pd.Series]) -> list[float]:
+        """Score aligned snapshots in one extension inference call."""
         if self._unsupervised is None:
             raise DetectorUnavailable(
                 "TabPFN anomaly model has not been fit on normal TRAIN snapshots"
             )
+        if not vectors:
+            return []
         try:
             import torch
 
             data = np.asarray(
-                [vector.reindex(self._anomaly_columns, fill_value=0.0)], dtype=np.float32
+                [
+                    vector.reindex(self._anomaly_columns, fill_value=0.0).to_numpy(dtype=float)
+                    for vector in vectors
+                ],
+                dtype=np.float32,
             )
             # The extension uses both its module-level Python RNG for feature ordering
             # and torch's CPU RNG for density noise. Forking preserves the caller's RNG.
@@ -412,11 +633,17 @@ class TabPFNBackend:
                         self._unsupervised_module.random = previous_random
                 else:
                     result = self._unsupervised.outliers(data, n_permutations=1)
-            return float(
-                np.asarray(result.detach().cpu() if hasattr(result, "detach") else result).reshape(
-                    -1
-                )[0]
-            )
+            scores = np.asarray(
+                result.detach().cpu() if hasattr(result, "detach") else result,
+                dtype=float,
+            ).reshape(-1)
+            if len(scores) != len(vectors) or not np.isfinite(scores).all():
+                raise DetectorUnavailable(
+                    "TabPFN anomaly scoring returned invalid batch results"
+                )
+            return scores.tolist()
+        except DetectorUnavailable:
+            raise
         except Exception as exc:
             raise DetectorUnavailable(
                 f"TabPFN anomaly scoring failed ({type(exc).__name__})"

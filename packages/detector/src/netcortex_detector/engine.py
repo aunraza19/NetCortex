@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -265,19 +266,24 @@ def run_engine(
         return _empty_result(site_id, end, backend.provenance, "invalid_measurements")
     vector = _vector(features, end)
     try:
-        forecasts = backend.forecasts(features.tail(cfg.context_rows), 5)
-        _validate_forecast_rows(forecasts)
-        sustained = _walk_forward_exceedances(features.tail(cfg.context_rows), backend, cfg)
-        if (
-            training_features is not None
-            and training_labels is not None
-            and hasattr(backend, "predict_cause")
-        ):
-            cause, confidence = backend.predict_cause(vector, training_features, training_labels)
+        inference_features = features.tail(cfg.context_rows)
+        if getattr(backend, "supports_parallel_inference", False):
+            forecasts, sustained, cause, confidence, raw_anomaly = _parallel_inference(
+                backend,
+                inference_features,
+                vector,
+                cfg,
+                training_features,
+                training_labels,
+            )
         else:
-            cause, confidence = backend.cause(vector)
-            confidence = float(confidence)
-        raw_anomaly = float(backend.anomaly(vector))
+            forecasts = backend.forecasts(inference_features, 5)
+            sustained = _walk_forward_exceedances(inference_features, backend, cfg)
+            cause, confidence = _infer_cause(
+                backend, vector, training_features, training_labels
+            )
+            raw_anomaly = float(backend.anomaly(vector))
+        _validate_forecast_rows(forecasts)
         if not np.isfinite(confidence) or not np.isfinite(raw_anomaly):
             raise DetectorUnavailable("backend returned a nonfinite score or confidence")
         anomaly = float(np.clip(raw_anomaly, 0.0, 1.0))
@@ -316,6 +322,58 @@ def run_engine(
     }
 
 
+def _infer_cause(
+    backend: Backend,
+    vector: pd.Series,
+    training_features: pd.DataFrame | None,
+    training_labels: list[str] | None,
+) -> tuple[str, float]:
+    if (
+        training_features is not None
+        and training_labels is not None
+        and hasattr(backend, "predict_cause")
+    ):
+        cause, confidence = backend.predict_cause(vector, training_features, training_labels)
+    else:
+        cause, confidence = backend.cause(vector)
+    return cause, float(confidence)
+
+
+def _parallel_inference(
+    backend: Backend,
+    features: pd.DataFrame,
+    vector: pd.Series,
+    config: DetectorConfig,
+    training_features: pd.DataFrame | None,
+    training_labels: list[str] | None,
+) -> tuple[list[dict[str, Any]], bool, str, float, float]:
+    """Overlap independent provider paths only for backends opting in explicitly."""
+    prepare = getattr(backend, "prepare_parallel_inference", None)
+    if prepare is not None:
+        prepare()
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            "forecasts": executor.submit(backend.forecasts, features, 5),
+            "sustained": executor.submit(
+                _walk_forward_exceedances, features, backend, config
+            ),
+            "cause": executor.submit(
+                _infer_cause, backend, vector, training_features, training_labels
+            ),
+            "anomaly": executor.submit(backend.anomaly, vector),
+        }
+        try:
+            forecasts = futures["forecasts"].result()
+            sustained = futures["sustained"].result()
+            cause, confidence = futures["cause"].result()
+            raw_anomaly = float(futures["anomaly"].result())
+        except Exception:
+            for future in futures.values():
+                future.cancel()
+            raise
+    return forecasts, sustained, cause, confidence, raw_anomaly
+
+
 def _walk_forward_exceedances(
     features: pd.DataFrame, backend: Backend, config: DetectorConfig
 ) -> bool:
@@ -333,12 +391,19 @@ def _walk_forward_exceedances(
         (times[position] - times[position - 1]) != pd.Timedelta(minutes=1) for position in (1, 2)
     ):
         return False
-    hits: dict[str, list[bool]] = {metric: [] for metric in targets}
+    contexts: list[tuple[pd.DataFrame, pd.Timestamp]] = []
     for target_time in times:
         prior = features.loc[features.index < target_time].tail(config.context_rows)
         if len(prior) < config.min_history_minutes:
             return False
-        made = backend.forecasts(prior, 1)
+        contexts.append((prior, target_time))
+    batch_method = getattr(backend, "walk_forward_forecasts", None)
+    if batch_method is not None:
+        results = batch_method(contexts)
+    else:
+        results = [backend.forecasts(prior, 1) for prior, _ in contexts]
+    hits: dict[str, list[bool]] = {metric: [] for metric in targets}
+    for (_, target_time), made in zip(contexts, results, strict=True):
         by_metric = {str(row["metric"]): row for row in made}
         for metric in targets:
             forecast = by_metric.get(metric)

@@ -3,13 +3,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Filter, Search } from "lucide-react";
 import { transport } from "@/lib/transport";
-import type { Incident } from "@/lib/types";
+import type { Incident, Site } from "@/lib/types";
 import { SectionTitle, Status, ErrorBox } from "./ui";
 export function IncidentList({ initialSite = "" }: { initialSite?: string }) {
   const [items, setItems] = useState<Incident[]>([]),
     [status, setStatus] = useState(""),
     [site, setSite] = useState(initialSite),
     [query, setQuery] = useState(""),
+    [sites, setSites] = useState<Site[]>([]),
     [err, setErr] = useState("");
   const load = useCallback(
     () =>
@@ -21,6 +22,10 @@ export function IncidentList({ initialSite = "" }: { initialSite?: string }) {
   );
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
+    void transport
+      .sites()
+      .then(setSites)
+      .catch(() => setSites([]));
     const unsubscribe = transport.subscribe(
       () => void load(),
       () => void load(),
@@ -60,9 +65,11 @@ export function IncidentList({ initialSite = "" }: { initialSite?: string }) {
               aria-label="Filter by site"
             >
               <option value="">All sites</option>
-              <option value="north-tower">North Tower</option>
-              <option value="market-cafe">Market Cafe</option>
-              <option value="east-relay">East Relay</option>
+              {sites.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
             </select>
           </label>
           <select

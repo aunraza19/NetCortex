@@ -100,3 +100,23 @@ calls `infra/chr/chr.py start` to provision the canonical three-NIC baseline,
 then runs `infra/chr/test_templates.py` for actual apply/export/rollback checks.
 It retains the QEMU log and structured test report and always calls canonical
 stop. The old one-NIC bootstrap remains a separate missing-harness boot smoke.
+
+## Current merged runtime connections
+
+| Entry | Connected operation | Exit / error |
+| --- | --- | --- |
+| `eval/api_demo.py --awaiting` | Actual FastAPI app with saved DemoStore, `_env_file=None`; optionally marks one valid saved plan awaiting review | Loopback HTTP/SSE for browser acceptance; no DB, Temporal, model or router calls |
+| `npm run api:types` | `OPENAPI_URL` -> merged API `/openapi.json` | Generated `lib/generated/openapi.d.ts`; explicit UI adapters consume these schemas |
+| Dashboard load / 30-second refresh / named SSE event or reconnect | `GET /sites`, `/incidents`, `/metrics?site_id=...&series=...&from=...&to=...` | Actual dynamic site health, incident summaries and timestamp-joined actual/forecast points; missing fields remain unavailable |
+| Dashboard mode check | `GET /health` -> `demo_mode` | Saved replay label, confirmed live label or unknown mode; scenario actions require confirmed non-replay health |
+| Incident detail | `GET /incidents/{id}` -> nested incident/report, fix_plan and timeline | Actual evidence, EN/UR customer text, CHR commands, dry-run status and authoritative incident state |
+| Approve / reject awaiting incident | `POST /incidents/{id}/approve` or `/reject`, then authoritative GET; SSE refreshes later changes | 202 acknowledgement is not assumed resolution; errors stay visible |
+| Live scenario action | Confirm `/health`, then `POST /demo/scenarios` using dynamic site ID | Actual ScenarioLabel acknowledgement, then workflow/incident updates; saved replay blocks injection |
+| `simgen.inject("sim-tower", ...)` | Advisory-locked transaction; preserve existing Site, deduplicate backfill, replace only bounded prior simulated recovery, write core probe/interface/subscriber metrics plus label | Atomic normal history + incident + scripted recovery; overlap/topology errors abort |
+| `netcortex-detector-worker --artifact PATH` | `configure_detector` in thread -> lazy `netcortex_worker.main.run()` in same process | Real model ready before Temporal monitoring; setup failure exits nonzero with type-only error |
+| Public `detect(site_id, window, history)` | Actual TabPFN: bounded metric forecast workers, past-only exceedance checks, cause and normal-density anomaly inference | Valid core DetectionResult in memory; worker persists forecasts |
+| `eval/runtime_canary.py` | Full in-memory sim-tower observations -> actual configured TabPFN -> core result validation and timing | Ignored sanitized report; latency gate separate from model accuracy; no DB or router writes |
+
+The previous draft HTTP description above is historical. Generated schemas and
+the merged API own the current contract. Settings editing remains a local UI
+preference; no unsupported backend settings endpoint is invented.

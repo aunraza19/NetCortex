@@ -1,6 +1,6 @@
 # NetCortex web dashboard
 
-Next.js App Router dashboard for the NetCortex operator. It supports a deterministic local fixture mode and a live API mode.
+Next.js App Router dashboard for network operators. It supports local fixture mode and the merged FastAPI contract.
 
 ## Run locally
 
@@ -11,8 +11,12 @@ $env:NEXT_PUBLIC_API_MODE = 'mock'
 npm run dev
 ```
 
-Use `NEXT_PUBLIC_API_MODE=live` and `NEXT_PUBLIC_API_BASE_URL` to connect to Aun's API. Live mode calls the draft routes in `decision.md`; request timeouts and errors appear in the UI and never switch to fixtures. Those API payload types remain provisional until Aun publishes OpenAPI and shared contracts. The fixture values and CHR outcomes are invented demo records; the UI labels them “Demo: replayed data.” Mock approval simulates workflow states in browser memory only. No router is contacted. Customer messages remain English or Urdu text.
+For the API, set `NEXT_PUBLIC_API_MODE=live` and `NEXT_PUBLIC_API_BASE_URL` to the service origin. The app reads `/health` to distinguish a live operation from saved `DEMO_MODE` replay. API replay is read only for scenario injection; its incident approvals update the saved snapshot. Live injection targets the API simulator and approval can run the approved commands against the connected CHR. Requests have finite timeouts and visible errors; a failed API call never falls back to local fixtures.
 
-`NEXT_PUBLIC_SENTRY_DSN` enables browser monitoring; server monitoring reads `SENTRY_DSN`. No DSN is committed. Sentry setup is code-ready but not connected or verified without the project DSN.
+Live payloads use generated `lib/generated/openapi.d.ts` types and explicit adapters in `lib/transport.ts`. Fields absent from the API, such as site location and subscriber totals, display as unavailable. Incident details render the nested report, fix plan, timeline and English/Urdu customer messages. Metric values and forecast bands are joined by timestamp. Metric views refresh every 30 seconds and named stream events trigger an immediate refresh.
 
-For production, run `npm run build` then `npm run start -- --hostname 0.0.0.0 --port 3000`. Render should run the app as a Node web service, not a static export. When Aun publishes the schema, run `$env:OPENAPI_URL = 'http://…/openapi.json'; npm run api:types`. The generator requires that URL, uses a bounded fetch, and writes `lib/generated/openapi.d.ts`. No generated API types are included until the actual schema is available.
+Run `npm run test:e2e` for fixture browser coverage, `npm run test:e2e:live` for HTTP failure/stream contract mocks, and `npm run test:e2e:api` for browser coverage against the saved API replay. The API replay test starts a private in-memory snapshot service and needs no database, Temporal, model provider or router.
+
+`NEXT_PUBLIC_SENTRY_DSN` enables browser monitoring; server monitoring reads `SENTRY_DSN`. No DSN is committed, and monitoring is not claimed as connected or verified without the project DSN.
+
+For production, run `npm run build` and `npm run start -- --hostname 0.0.0.0 --port 3000`. Render should run the app as a Node service, not a static export. Regenerate API types from an authorized running API using `OPENAPI_URL=<origin>/openapi.json npm run api:types`.

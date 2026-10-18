@@ -47,14 +47,16 @@ export function Dashboard() {
     [error, setError] = useState("");
   const refresh = async () => {
     try {
-      const [s, i, m] = await Promise.all([
+      const [siteRows, i] = await Promise.all([
         transport.sites(),
         transport.incidents(),
-        transport.metrics("north-tower"),
       ]);
-      setSites(s);
+      const metrics = siteRows.length
+        ? await transport.metrics(siteRows[0].id)
+        : [];
+      setSites(siteRows);
       setIncidents(i);
-      setSeries(m);
+      setSeries(metrics);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load network data.");
@@ -62,12 +64,14 @@ export function Dashboard() {
   };
   useEffect(() => {
     const timer = window.setTimeout(() => void refresh(), 0);
+    const interval = window.setInterval(() => void refresh(), 30000);
     const unsubscribe = transport.subscribe(
       () => void refresh(),
       () => void refresh(),
     );
     return () => {
       window.clearTimeout(timer);
+      window.clearInterval(interval);
       unsubscribe();
     };
   }, []);
@@ -76,12 +80,9 @@ export function Dashboard() {
   );
   return (
     <div className="page">
-      <SectionTitle
-        eyebrow="Sunday, October 18 · North region"
-        title="Network overview"
-      >
+      <SectionTitle eyebrow="Network operations" title="Network overview">
         <div className="updated-label">
-          <span className="pulse" /> Updating every minute{" "}
+          <span className="pulse" /> Refreshing every 30 seconds{" "}
           <MoreHorizontal size={17} />
         </div>
       </SectionTitle>
@@ -98,7 +99,7 @@ export function Dashboard() {
           <div>
             <small>Sites monitored</small>
             <strong>
-              {sites.length} <em>of 3</em>
+              {sites.length} <em>connected</em>
             </strong>
           </div>
         </div>
@@ -168,7 +169,9 @@ export function Dashboard() {
                     ? "Operational"
                     : s.health === "degraded"
                       ? "Degraded"
-                      : "Down"}
+                      : s.health === "down"
+                        ? "Down"
+                        : "Unknown"}
                 </span>
               </div>
               <span className="more-button" aria-hidden="true">
@@ -177,27 +180,28 @@ export function Dashboard() {
             </div>
             <h3>{s.name}</h3>
             <p className="site-location">
-              {s.location} <span>·</span> {s.subscribers} subscribers
+              {s.location === "—" ? "—" : s.location} <span>·</span>{" "}
+              {s.subscribers ?? "—"} subscribers
             </p>
             <div className="site-metrics">
               <div>
                 <small>UPLINK USAGE</small>
                 <strong>
-                  {s.utilization}
-                  <i>%</i>
+                  {s.utilization ?? "—"}
+                  {s.utilization !== null && <i>%</i>}
                 </strong>
                 <div className="meter">
                   <span
-                    style={{ width: `${s.utilization}%` }}
-                    className={s.health === "down" ? "meter-red" : ""}
+                    style={{ width: `${s.utilization ?? 0}%` }}
+                    className={`${s.health === "down" ? "meter-red" : ""} ${s.utilization === null ? "meter-empty" : ""}`}
                   />
                 </div>
               </div>
               <div>
                 <small>WORST LATENCY</small>
                 <strong>
-                  {s.latency}
-                  <i>ms</i>
+                  {s.latency ?? "—"}
+                  {s.latency !== null && <i>ms</i>}
                 </strong>
               </div>
             </div>
@@ -205,6 +209,7 @@ export function Dashboard() {
               <span>
                 <Wifi size={13} />
                 {s.uplink}
+                {s.backupUplink && <small> · Backup {s.backupUplink}</small>}
               </span>
               <ArrowRight size={15} />
             </div>
@@ -221,7 +226,10 @@ export function Dashboard() {
           <div className="panel-heading">
             <div>
               <h2>Latency forecast</h2>
-              <p>North Tower · external probe · past 24 hours, Pakistan time</p>
+              <p>
+                {sites[0]?.name ?? "Selected site"} · external probe · past 24
+                hours, Pakistan time
+              </p>
             </div>
             <span className="chart-units">MILLISECONDS</span>
           </div>
@@ -283,7 +291,10 @@ export function Dashboard() {
                 <span className="compact-copy">
                   <strong>{i.title}</strong>
                   <small>
-                    {i.siteName} <i>·</i> <Pst date={i.openedAt} />
+                    {i.siteName} <i>·</i> <Pst date={i.openedAt} /> <i>·</i>{" "}
+                    {i.confidence === null
+                      ? "Confidence unavailable"
+                      : `${Math.round(i.confidence * 100)}% confidence`}
                   </small>
                 </span>
                 <Status status={i.status} />

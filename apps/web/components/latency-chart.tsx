@@ -18,7 +18,11 @@ export function LatencyChart({
   compact?: boolean;
 }) {
   return (
-    <div className={`chart-wrap ${compact ? "chart-compact" : ""}`}>
+    <div
+      className={`chart-wrap ${compact ? "chart-compact" : ""}`}
+      role="img"
+      aria-label={`Latency chart with ${data.filter((point) => point.actual !== null).length} actual readings and ${data.filter((point) => point.p50 !== null).length} forecast readings`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}

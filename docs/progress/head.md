@@ -53,3 +53,29 @@ future forecast points and no detector DB writes. Save sanitized timing/result.
 Embedding installation, deployment, broad evaluation and other work are outside
 this requested follow-up. Prior Labs model/client adapters may need SDK fixes
 based on actual calls; keep the patch and tests focused.
+
+## Current handoff: runtime integration supersedes the sequence above
+
+Continue on the existing b/workstream-b and PR #1; no new branch or PR. Merge
+commit ce3325f incorporates main f062f9d/runtime PR #7. Main's four root files
+remain identical; uv lock regenerated. Aun's ownership paths are unchanged.
+
+Lead acceptance plan is docs/RUNTIME_INTEGRATION_VALIDATION.md. Three Luna medium
+workers implement UI HTTP adapters, sim-tower runtime injection, and detector
+startup/inference concurrency, maintaining component decision/flow/progress files.
+Lead tests cover startup ordering, valid sim-tower rows/recovery, concurrency
+parity, explicit failure and actual merged API browser decisions. CI now runs
+the actual API browser suite in addition to existing mock/live UI coverage.
+
+Latest offline Python run: 261 passed, 3 live deselected; Ruff passed. Mock UI
+browser suite passed 16, live contract suite 7, and actual API replay suite 2.
+Production build and formatting/type/lint checks passed. eval/results/runtime.md records measured external checks;
+ignored .build-check holds sanitized detailed reports. Never open .env or publish
+this credential-bearing conversation. No migration or router operations.
+
+Public SQL injection was verified in a force-rollback transaction; all row counts
+and the existing Site returned unchanged. Full sim-tower inference returns seven
+five-point series. Batching past-only walk-forward queries reduced latest detect
+to 62.1 seconds (setup 99.1), below the 120-second monitor timeout. It still
+guessed uplink_down for heavy_user; cause quality, embeddings/ingestion, hosting
+and a new local full Temporal stack are not claimed.

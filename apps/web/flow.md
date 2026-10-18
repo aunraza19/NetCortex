@@ -14,8 +14,11 @@ flowchart TD
   Demo --> T
   T --> Mode{NEXT_PUBLIC_API_MODE}
   Mode -->|mock| Store[In-memory fixture store]
-  Mode -->|live| API[FastAPI draft API]
+  Mode -->|live configured| Health[GET health]
+  Health -->|demo_mode true| APIReplay[Saved API snapshot]
+  Health -->|demo_mode false| API[FastAPI live API]
   API --> SSE[/stream named events/]
+  APIReplay --> SSE
   SSE --> T
   Store --> Views[Render fixture records with replay disclosure]
   API --> Views
@@ -28,6 +31,7 @@ flowchart TD
   Decide2 -->|mock| Rejected[rejected]
   Decide -->|live| API
   Decide2 -->|live| API
+  APIReplay -->|injection disabled| Demo[Read only replay panel]
   App -. optional DSN .-> Sentry[Sentry browser and server SDK]
 ```
 
@@ -43,11 +47,11 @@ flowchart TD
 
 ## Transport and lifecycle
 
-`lib/transport.ts` implements the `Transport` interface. Live mode uses GET `/sites`, GET `/metrics?site_id=…&series=probe%3A1.1.1.1%3Artt_ms&from=<ISO>&to=<ISO>`, GET `/incidents?status=…`, GET `/incidents/{id}`, POST `/demo/scenarios`, POST `/incidents/{id}/approve`, POST `/incidents/{id}/reject`, and EventSource GET `/stream`. Decision POST bodies are treated only as acknowledgements: the app immediately GETs `/incidents/{id}` and renders that authoritative record. Scenario injection POST is also treated as an acknowledgement; the app says diagnosis is queued and links to the incident list rather than treating the response as an incident. Each fetch has a seven-second abort timeout; OpenAPI download is separately bounded to ten seconds. A failed live request raises an error; there is no fixture fallback. These payload mappings are provisional until OpenAPI is available. The metrics key currently uses the documented `probe:<target>:rtt_ms` pattern and remains provisional until the published schema confirms it. Run `OPENAPI_URL=<published-schema-url> npm run api:types` to generate a separate type file once Aun publishes the schema. No generated types are currently present.
+`lib/transport.ts` implements the `Transport` interface. Live mode uses generated API `components` and `paths` types for GET `/health`, `/sites`, `/metrics?site_id=…&series=probe%3A1.1.1.1%3Artt_ms&from=<ISO>&to=<ISO>`, `/incidents?status=…`, `/incidents/{id}`, POST `/demo/scenarios`, POST `/incidents/{id}/approve`, POST `/incidents/{id}/reject`, and EventSource GET `/stream`. Site and incident records are explicitly adapted from API shapes; primary and backup uplinks use their `role` and `iface` fields, and absent site location/subscriber data renders as unavailable. Metric actuals and forecast bands are joined by timestamp and sorted chronologically. Decision POST bodies are acknowledgements only; the app immediately GETs the incident and renders that authoritative record. Scenario injection is read only in API replay mode. Ordinary GET requests have a seven-second deadline; potentially Temporal-backed POSTs have a 30-second deadline and are never retried. A failed API request stays visible; the app never falls back to fixtures.
 
-The stream subscribes to `metric`, `incident.opened`, `incident.updated`, `fix.tested`, and `fix.applied`. Any event causes a route refresh. Repeated event IDs are ignored in the current connection. EventSource reconnects itself; both `onerror` and a later `onopen` trigger a refresh so recovery is reflected. Component cleanup removes listeners and closes the connection. Server event IDs, replay and heartbeat behavior remain an integration question.
+The stream subscribes to `metric`, `incident.opened`, `incident.updated`, `fix.tested`, and `fix.applied`. Any event causes a route refresh. Dashboard metrics also refresh on a 30-second interval. Repeated event IDs are ignored in the current connection. EventSource reconnects itself; both `onerror` and a later `onopen` trigger a refresh so recovery is reflected. Component cleanup removes listeners, closes the connection and clears refresh timers.
 
-In mock mode, injection adds a browser-memory incident for each of the seven catalog scenarios; normal traffic produces no incident. The three notify-only causes and an uplink failure at Market Cafe (which has no configured backup) use `template: none`, have no router commands, and cannot be approved. Actionable mock incidents show clearly simulated test evidence. Approval is possible only when the status is `awaiting_approval`, the test passed, and the template and command list are valid. A confirmation dialog precedes approve/reject, and a synchronous busy guard prevents repeat submissions. Mock approval exposes applying, verifying, then either resolved or rolled-back states according to the chosen scenario; rejection records rejected. Site cards reflect active replayed incidents. These timers model a workflow and do not contact CHR or a physical router.
+In mock mode, injection adds a browser-memory incident for each of the seven catalog scenarios; normal traffic produces no incident. The three notify-only causes and an uplink failure at Market Cafe (which has no configured backup) use `template: none` and have no router commands. Approval is possible only when status is `awaiting_approval`, the router test passed, and the template and command list are valid. Rejection is also limited to `awaiting_approval`, matching the API. A confirmation dialog precedes either decision, and a synchronous busy guard prevents repeat submissions. Mock approval exposes applying, verifying, then either resolved or rolled-back states. These timers model a workflow and do not contact CHR or a physical router. In API replay mode, the panel lists real API sites but disables scenario injection; approval records the decision in the saved in-memory snapshot only. In operational API mode, injection targets the simulator and approved commands may be applied to the connected CHR.
 
 The optional Sentry SDK is initialized from `NEXT_PUBLIC_SENTRY_DSN` in the browser and `SENTRY_DSN` on the server. No PII capture is enabled in the app. Without a DSN no event is sent; the UI does not claim connection or verification.
 

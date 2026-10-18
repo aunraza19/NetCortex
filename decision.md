@@ -98,3 +98,45 @@ now uses Aun's canonical start/stop commands and unchanged template harness.
 Credentials are random per job, masked before sharing through GITHUB_ENV, and
 only QEMU logs and the template JSON report are uploaded. Lead acceptance cases
 were written first; a boot-only pass cannot substitute for four restored fixes.
+
+## Merged runtime integration (main f062f9d)
+
+Continue on b/workstream-b and PR #1 as the user requested. Merge the runtime
+without changing Aun's core, agent, API, worker, collector or router code. Keep
+main's four required root files identical and regenerate uv.lock with uv.
+
+The lead wrote docs/RUNTIME_INTEGRATION_VALIDATION.md and acceptance cases before
+delegating implementation to three gpt-6-luna medium workers. The dashboard now
+adapts generated types from the merged API's actual /openapi.json. Its fixture
+view model stays a presentation detail; nullable API values remain unavailable,
+and live HTTP errors never become fixture successes. /health determines whether
+the API serves saved replay. Unknown health disables scenario injection. Dynamic
+sites, actual EN/UR report text and commands, SSE invalidation, periodic metrics
+refresh, and POST acknowledgement followed by authoritative GET match the runtime.
+
+sim-tower is a dedicated runtime topology, excluded from the original three-site
+evaluation generation. Its injection preserves any existing Site and source=live
+rows, supplies missing normal observations and scripted recovery, and serializes
+overlap checks and writes in one transaction. Recovery is simulated input, not
+evidence that a router fix caused improvement. Unsupported game/wireless scenarios
+on this topology fail explicitly rather than inventing missing targets.
+
+The B-owned netcortex-detector-worker launcher configures a legitimate TRAIN/
+normal-VALIDATION artifact before entering the unchanged worker in the same
+process. This is necessary because prepared provider state is process-local.
+Initialization stays outside the 120-second monitor activity. Independent TabPFN
+inference paths overlap only through an explicit backend capability; custom
+backends keep sequential behavior. Forecasts retain all eligible varying raw metrics, bounded
+parallelism and past-only walk-forward checks. The 90-second forecast budget is
+per batch, not a guarantee for the entire monitor activity. Worker-owned forecast
+persistence stays unchanged. Measured results and limitations are recorded in
+eval/results/runtime.md; a contract pass does not establish cause accuracy. The
+latest real full-series inference takes 62.1 seconds (setup 99.1 seconds), within
+the worker's 120-second activity limit. Cause accuracy and repeated-run
+reliability remain unverified.
+
+Browser acceptance runs the actual merged API's DemoStore with dotenv disabled,
+including real REST decisions against an in-memory pending snapshot incident.
+This tests the HTTP integration without claiming a local Temporal/router run.
+The credentialed SQL check rolls back all test writes. Real-provider diagnostics
+are captured privately and sanitized; no current transcript is published.

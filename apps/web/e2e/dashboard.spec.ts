@@ -63,7 +63,7 @@ test("approval needs confirmation and visibly simulates each stage", async ({
   await expect(page.getByText("resolved", { exact: true })).toBeVisible();
 });
 
-test("failed router check blocks approval and rejection is confirmed", async ({
+test("failed router check on an open incident blocks approval and rejection", async ({
   page,
 }) => {
   await page.goto("/incidents/INC-2083");
@@ -71,6 +71,15 @@ test("failed router check blocks approval and rejection is confirmed", async ({
   await expect(
     page.getByRole("button", { name: "Approve change" }),
   ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reject change" })).toHaveCount(
+    0,
+  );
+});
+
+test("an awaiting approval can be rejected after confirmation", async ({
+  page,
+}) => {
+  await page.goto("/incidents/INC-2084");
   await page.getByRole("button", { name: "Reject change" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page

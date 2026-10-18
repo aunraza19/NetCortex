@@ -14,16 +14,17 @@ export type Cause =
   | "game_route_issue"
   | "wireless_interference"
   | "uplink_down"
-  | "dns_slow";
+  | "dns_slow"
+  | "normal";
 export type Site = {
   id: string;
   name: string;
   location: string;
-  subscribers: number;
-  health: Health;
-  utilization: number;
-  latency: number;
-  loss: number;
+  subscribers: number | null;
+  health: Health | "unknown";
+  utilization: number | null;
+  latency: number | null;
+  loss: number | null;
   uplink: string;
   backupUplink?: string;
 };
@@ -41,9 +42,11 @@ export type Incident = {
   cause: Cause;
   title: string;
   status: IncidentStatus;
-  confidence: number;
+  confidence: number | null;
   openedAt: string;
   summary: string;
+  customerMessageEn?: string;
+  customerMessageUr?: string;
   evidence: string[];
   template: string;
   fix: string[];
@@ -51,7 +54,7 @@ export type Incident = {
   dryRun: "passed" | "failed" | "pending";
   dryRunMessage: string;
   simulatedOutcome?: "resolved" | "rolled_back";
-  news?: { label: string; url: string };
+  news?: { label: string; url?: string };
   timeline: {
     at: string;
     label: string;

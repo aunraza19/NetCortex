@@ -288,7 +288,11 @@ def generate(
     if scenario_type is not None and scenario_type not in CAUSES:
         raise ValueError(f"unsupported scenario: {scenario_type}")
     layout = sites()["sites"]
-    selected = [s for s in layout if site_id is None or s["id"] == site_id]
+    selected = (
+        [s for s in layout if s["id"] == site_id]
+        if site_id is not None
+        else [s for s in layout if not s.get("runtime_only")]
+    )
     if not selected:
         raise ValueError(f"unknown site: {site_id}")
     start = _utc(start or datetime(2026, 10, 12, tzinfo=UTC))
@@ -600,7 +604,12 @@ def generate_subscribers(
     start, end = _utc(start), _utc(end)
     if end <= start:
         raise ValueError("subscriber end must follow start")
-    selected = [s for s in sites()["sites"] if site_ids is None or s["id"] in site_ids]
+    selected = [
+        s
+        for s in sites()["sites"]
+        if (site_ids is not None and s["id"] in site_ids)
+        or (site_ids is None and not s.get("runtime_only"))
+    ]
     times = pd.date_range(start=start, end=end, freq="30s", inclusive="left", tz="UTC")
     rows = []
     for ix, site in enumerate(selected):
@@ -665,12 +674,32 @@ def site_from_fixture(site_id: str) -> Site:
         "1.1.1.1": TargetRole.PUBLIC_DNS,
         "8.8.8.8": TargetRole.PUBLIC_DNS,
     }
-    targets = [ProbeTarget(key=target, host=target, role=role[target]) for target in raw["targets"]]
-    targets.append(
-        ProbeTarget(
-            key="dns:1.1.1.1", host="1.1.1.1", kind=ProbeKind.DNS, role=TargetRole.PUBLIC_DNS
+    targets = []
+    for target in raw["targets"]:
+        if target.startswith("dns:"):
+            targets.append(
+                ProbeTarget(
+                    key=target,
+                    host=target.removeprefix("dns:"),
+                    kind=ProbeKind.DNS,
+                    role=TargetRole.PUBLIC_DNS,
+                )
+            )
+        else:
+            target_role = role.get(
+                target,
+                TargetRole.GATEWAY if target == "10.0.0.1" else TargetRole.PUBLIC_DNS,
+            )
+            targets.append(ProbeTarget(key=target, host=target, role=target_role))
+    if not any(target.key == "dns:1.1.1.1" for target in targets):
+        targets.append(
+            ProbeTarget(
+                key="dns:1.1.1.1",
+                host="1.1.1.1",
+                kind=ProbeKind.DNS,
+                role=TargetRole.PUBLIC_DNS,
+            )
         )
-    )
     return Site(
         id=raw["id"],
         name=raw["name"],
@@ -772,6 +801,18 @@ def inject(
     fixture_site = next((site for site in sites()["sites"] if site["id"] == site_id), None)
     if fixture_site is None:
         raise ValueError(f"unknown site: {site_id}")
+    if site_id == "sim-tower":
+        if cause is Cause.GAME_ROUTE_ISSUE:
+            raise ValueError("sim-tower has no configured game-server probe target")
+        if cause is Cause.WIRELESS_INTERFERENCE and not fixture_site.get("backhauls"):
+            raise ValueError("sim-tower has no configured wireless backhaul to interfere with")
+        return _inject_runtime_tower(
+            cause=cause,
+            duration_min=duration_min,
+            seed=actual_seed,
+            now=now,
+            database=database,
+        )
     setting = None
     if database is None:
         setting = Settings()
@@ -825,6 +866,289 @@ def inject(
         core_db.insert_probe_metrics(conn, probes)
         core_db.insert_iface_metrics(conn, ifaces)
         core_db.insert_subscriber_metrics(conn, subscribers)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO scenario_labels (id, site_id, scenario_type, start_at, end_at, "
+                "affected, expected_cause, expected_template, expected_params, seed, source) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    label.id,
+                    label.site_id,
+                    label.scenario_type.value,
+                    label.start_at,
+                    label.end_at,
+                    Jsonb(label.affected),
+                    label.expected_cause.value,
+                    label.expected_template.value,
+                    Jsonb(label.expected_params),
+                    label.seed,
+                    label.source.value,
+                ),
+            )
+    return label
+
+
+_RUNTIME_TARGETS = {
+    "10.0.0.1": (ProbeKind.ICMP, 2.0),
+    "1.1.1.1": (ProbeKind.ICMP, 18.0),
+    "8.8.8.8": (ProbeKind.ICMP, 25.0),
+    "dns:192.0.2.53": (ProbeKind.DNS, 22.0),
+    "dns:1.1.1.1": (ProbeKind.DNS, 12.0),
+}
+_RUNTIME_SUBSCRIBERS = {
+    "10.0.0.42": 4.0,
+    "10.0.0.57": 3.0,
+    "10.0.0.63": 2.5,
+}
+_RUNTIME_RECOVERY_MIN = 20
+_RUNTIME_BACKFILL_MIN = 30
+_RUNTIME_BATCH_SIZE = 1000
+
+
+def _aligned_times(start: datetime, end: datetime, seconds: int):
+    """Yield cadence timestamps aligned to UTC epoch boundaries."""
+    epoch = int(start.timestamp())
+    first = ((epoch + seconds - 1) // seconds) * seconds
+    stamp = datetime.fromtimestamp(first, UTC)
+    while stamp < end:
+        if stamp >= start:
+            yield stamp
+        stamp += timedelta(seconds=seconds)
+
+
+def _runtime_rows(
+    start: datetime,
+    end: datetime,
+    cause: Cause | None,
+    seed: int,
+) -> tuple[list[ProbeMetric], list[IfaceMetric], list[SubscriberMetric]]:
+    """Build actual core metrics for sim-tower, including its distinct DNS probes."""
+    rng = np.random.default_rng(seed)
+    probes: list[ProbeMetric] = []
+    ifaces: list[IfaceMetric] = []
+    subscribers: list[SubscriberMetric] = []
+    for stamp in _aligned_times(start, end, 10):
+        for target, (kind, baseline) in _RUNTIME_TARGETS.items():
+            rtt: float | None = max(0.1, baseline * rng.uniform(0.9, 1.15))
+            loss = 0.0
+            if cause is Cause.DNS_SLOW and target == "dns:192.0.2.53":
+                rtt, loss = float(rng.uniform(585, 715)), 20.0
+            elif cause is Cause.UPLINK_DOWN and target in {"1.1.1.1", "8.8.8.8"}:
+                rtt, loss = None, 100.0
+            elif cause is Cause.HEAVY_USER and target in {"1.1.1.1", "8.8.8.8"}:
+                rtt *= 5.5
+            elif cause is Cause.UPLINK_CONGESTION and target in {"1.1.1.1", "8.8.8.8"}:
+                rtt *= 3.5
+            elif cause is Cause.UPSTREAM_DEGRADATION and target in {"1.1.1.1", "8.8.8.8"}:
+                rtt *= 2.5
+            elif cause is Cause.GAME_ROUTE_ISSUE and target == "8.8.8.8":
+                rtt *= 4.5
+            elif cause is Cause.WIRELESS_INTERFERENCE and target == "10.0.0.1":
+                rtt *= 3.0
+                loss = 12.0
+            probes.append(
+                ProbeMetric(
+                    time=stamp,
+                    site_id="sim-tower",
+                    target=target,
+                    kind=kind,
+                    rtt_ms=rtt,
+                    jitter_ms=None if rtt is None else max(0.1, rtt * 0.08),
+                    loss_pct=loss,
+                    source=Source.SIM,
+                )
+            )
+    for stamp in _aligned_times(start, end, 30):
+        rates = dict(_RUNTIME_SUBSCRIBERS)
+        if cause is Cause.HEAVY_USER:
+            rates["10.0.0.42"] = 140.0
+        for ip, mbps in rates.items():
+            rx = int(mbps * rng.uniform(0.9, 1.1) * 1_000_000)
+            subscribers.append(
+                SubscriberMetric(
+                    time=stamp,
+                    site_id="sim-tower",
+                    ip=ip,
+                    rx_bps=rx,
+                    tx_bps=rx // 10,
+                    source=Source.SIM,
+                )
+            )
+        for iface, capacity, util in (
+            (
+                "ether1",
+                180,
+                0.0
+                if cause is Cause.UPLINK_DOWN
+                else 98.0
+                if cause is Cause.UPLINK_CONGESTION
+                else 92.0
+                if cause is Cause.HEAVY_USER
+                else 55.0,
+            ),
+            (
+                "ether2",
+                80,
+                12.0
+                if cause is Cause.UPLINK_DOWN
+                else 0.5,
+            ),
+        ):
+            actual = util * rng.uniform(0.97, 1.01)
+            rx = int(capacity * 1_000_000 * max(0.0, actual) / 100)
+            ifaces.append(
+                IfaceMetric(
+                    time=stamp,
+                    site_id="sim-tower",
+                    iface=iface,
+                    rx_bps=rx,
+                    tx_bps=rx // 8,
+                    util_pct=max(0.0, actual),
+                    drops=15 if cause is Cause.UPLINK_CONGESTION else 0,
+                    errors=1 if cause is Cause.UPLINK_DOWN and iface == "ether1" else 0,
+                    source=Source.SIM,
+                )
+            )
+    return probes, ifaces, subscribers
+
+
+def _existing_runtime_keys(conn: Any, table: str, start: datetime, end: datetime) -> set[tuple]:
+    columns = {
+        "probe_metrics": "time, target",
+        "iface_metrics": "time, iface",
+        "subscriber_metrics": "time, ip",
+    }
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT {columns[table]} FROM {table} WHERE site_id=%s AND source='sim' "
+            "AND time >= %s AND time < %s",
+            ("sim-tower", start, end),
+        )
+        return {tuple(row) for row in cur.fetchall()}
+
+
+def _insert_bounded(helper: Any, conn: Any, rows: list[Any]) -> None:
+    for offset in range(0, len(rows), _RUNTIME_BATCH_SIZE):
+        helper(conn, rows[offset : offset + _RUNTIME_BATCH_SIZE])
+
+
+def _insert_runtime_rows(conn: Any, start: datetime, end: datetime, cause: Cause | None, seed: int):
+    probes, ifaces, subscribers = _runtime_rows(start, end, cause, seed)
+    existing = {
+        "probe": _existing_runtime_keys(conn, "probe_metrics", start, end),
+        "iface": _existing_runtime_keys(conn, "iface_metrics", start, end),
+        "subscriber": _existing_runtime_keys(conn, "subscriber_metrics", start, end),
+    }
+    probes = [r for r in probes if (r.time, r.target) not in existing["probe"]]
+    ifaces = [r for r in ifaces if (r.time, r.iface) not in existing["iface"]]
+    subscribers = [r for r in subscribers if (r.time, r.ip) not in existing["subscriber"]]
+    _insert_bounded(core_db.insert_probe_metrics, conn, probes)
+    _insert_bounded(core_db.insert_iface_metrics, conn, ifaces)
+    _insert_bounded(core_db.insert_subscriber_metrics, conn, subscribers)
+
+
+def _replace_prior_runtime_recovery(conn: Any, now: datetime) -> None:
+    """Remove only future simulator rows within the preceding scenario's scripted recovery."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT end_at FROM scenario_labels WHERE site_id=%s AND source='sim' "
+            "AND end_at <= %s AND end_at + interval '20 minutes' > %s "
+            "ORDER BY end_at DESC LIMIT 1",
+            ("sim-tower", now, now),
+        )
+        row = cur.fetchone()
+    if row is None:
+        return
+    recovery_end = row[0] + timedelta(minutes=_RUNTIME_RECOVERY_MIN)
+    for table in ("probe_metrics", "iface_metrics", "subscriber_metrics"):
+        with conn.cursor() as cur:
+            cur.execute(
+                f"DELETE FROM {table} WHERE site_id=%s AND source='sim' "
+                "AND time >= %s AND time < %s",
+                ("sim-tower", now, recovery_end),
+            )
+
+
+def _runtime_label(cause: Cause, duration_min: int, seed: int, now: datetime):
+    end = now + timedelta(minutes=duration_min)
+    fixture_site = next(x for x in sites()["sites"] if x["id"] == "sim-tower")
+    scenario = _label(fixture_site, cause.value, now, end, seed)
+    params = scenario["params"]
+    affected = scenario["affected"]
+    if cause is Cause.HEAVY_USER:
+        params = {"target": "10.0.0.42", "upload_mbps": 5, "download_mbps": 10}
+        affected = {"ip": "10.0.0.42"}
+    elif cause is Cause.DNS_SLOW:
+        params = {"servers": ["1.1.1.1", "8.8.8.8"]}
+        affected = {"resolver": "192.0.2.53"}
+    elif cause is Cause.UPLINK_DOWN:
+        params = {
+            "primary_gateway": "10.0.2.2",
+            "backup_gateway": "192.0.2.1",
+            "backup_distance": 2,
+        }
+        affected = {"iface": "ether1", "backup_iface": "ether2"}
+    elif cause is Cause.UPLINK_CONGESTION:
+        params = {
+            "uplink": "ether1",
+            "uplink_mbps": 162,
+            "game_ports": "3074,3478-3480,27015-27050",
+        }
+        affected = {"iface": "ether1"}
+    elif cause is Cause.GAME_ROUTE_ISSUE:
+        affected = {"target": "8.8.8.8"}
+    elif cause is Cause.WIRELESS_INTERFERENCE:
+        affected = {"target": "10.0.0.1"}
+    return ScenarioLabel(
+        site_id="sim-tower",
+        scenario_type=cause,
+        start_at=now,
+        end_at=end,
+        affected=affected,
+        expected_cause=cause,
+        expected_template=TemplateId(scenario["template_id"]),
+        expected_params=params,
+        seed=seed,
+        source=Source.SIM,
+    )
+
+
+def _inject_runtime_tower(
+    *,
+    cause: Cause,
+    duration_min: int,
+    seed: int,
+    now: datetime,
+    database: Any,
+) -> ScenarioLabel:
+    """Persist normal backfill, a runtime incident, and scripted recovery atomically."""
+    now = now.replace(second=(now.second // 10) * 10, microsecond=0)
+    end = now + timedelta(minutes=duration_min)
+    label = _runtime_label(cause, duration_min, seed, now)
+    setting = None
+    if database is None:
+        setting = Settings()
+        if setting.database_url is None:
+            raise ModuleUnavailable("DATABASE_URL is required for simulator injection")
+    pool = database if database is not None else core_db.get_pool(setting)
+    with pool.connection() as conn, conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", ("sim-tower",))
+            cur.execute(
+                "SELECT 1 FROM scenario_labels WHERE site_id=%s AND source='sim' "
+                "AND start_at < %s AND COALESCE(end_at, 'infinity') > %s LIMIT 1",
+                ("sim-tower", end, now),
+            )
+            if cur.fetchone():
+                raise ValueError("an injected scenario overlaps this site and time window")
+        if core_db.fetch_site(conn, "sim-tower") is None:
+            core_db.upsert_site(conn, site_from_fixture("sim-tower"))
+        _replace_prior_runtime_recovery(conn, now)
+        backfill_start = now - timedelta(minutes=_RUNTIME_BACKFILL_MIN)
+        _insert_runtime_rows(conn, backfill_start, now, None, seed)
+        _insert_runtime_rows(conn, now, end, cause, seed)
+        recovery_end = end + timedelta(minutes=_RUNTIME_RECOVERY_MIN)
+        _insert_runtime_rows(conn, end, recovery_end, None, seed)
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO scenario_labels (id, site_id, scenario_type, start_at, end_at, "

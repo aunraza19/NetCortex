@@ -10,7 +10,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { transport } from "@/lib/transport";
+import { apiMode, transport } from "@/lib/transport";
 import type { Incident } from "@/lib/types";
 import { Confirm, CopyButton, ErrorBox, Status } from "./ui";
 function Pst({ date }: { date: string }) {
@@ -33,6 +33,8 @@ export function IncidentDetail({ id }: { id: string }) {
     [err, setErr] = useState(""),
     [dialog, setDialog] = useState<"approve" | "reject" | null>(null),
     [busy, setBusy] = useState(false);
+  const [apiReplay, setApiReplay] = useState(false);
+  const [apiModeKnown, setApiModeKnown] = useState(apiMode === "mock");
   const busyRef = useRef(false);
   const load = useCallback(
     () =>
@@ -44,6 +46,14 @@ export function IncidentDetail({ id }: { id: string }) {
   );
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
+    if (apiMode === "live")
+      void transport
+        .health()
+        .then((health) => {
+          setApiReplay(!!health?.demo_mode);
+          setApiModeKnown(!!health);
+        })
+        .catch(() => setApiModeKnown(false));
     const unsubscribe = transport.subscribe(
       () => void load(),
       () => void load(),
@@ -82,12 +92,12 @@ export function IncidentDetail({ id }: { id: string }) {
       </div>
     );
   const canApprove =
+    apiModeKnown &&
     item.status === "awaiting_approval" &&
     item.dryRun === "passed" &&
     item.template !== "none" &&
     item.fix.length > 0;
-  const canReject =
-    item.status === "awaiting_approval" || item.status === "open";
+  const canReject = item.status === "awaiting_approval";
   return (
     <div className="page">
       <Link href="/incidents" className="back-link">
@@ -115,12 +125,21 @@ export function IncidentDetail({ id }: { id: string }) {
                 <strong>Network summary</strong>
                 <small>
                   Investigation complete <span>·</span>{" "}
-                  {Math.round(item.confidence * 100)}% confidence
+                  {item.confidence === null
+                    ? "Confidence unavailable"
+                    : `${Math.round(item.confidence * 100)}% confidence`}
                 </small>
               </div>
               <span className="agent-tag">AGENT REPORT</span>
             </div>
             <p className="summary-copy">{item.summary}</p>
+            <div className="customer-messages">
+              <h3>Customer update</h3>
+              <p lang="en">{item.customerMessageEn ?? "—"}</p>
+              <p lang="ur" dir="rtl">
+                {item.customerMessageUr ?? "—"}
+              </p>
+            </div>
             <div className="evidence-block">
               <h3>
                 <ShieldCheck size={15} /> What we observed
@@ -170,9 +189,11 @@ export function IncidentDetail({ id }: { id: string }) {
               <div>
                 <h3>Upstream check</h3>
                 <p>{item.news.label}</p>
-                <a href={item.news.url} target="_blank" rel="noreferrer">
-                  View source <ExternalLink size={13} />
-                </a>
+                {item.news.url && (
+                  <a href={item.news.url} target="_blank" rel="noreferrer">
+                    View source <ExternalLink size={13} />
+                  </a>
+                )}
                 <small>
                   News links are external references and may not reflect your
                   network.
@@ -265,7 +286,13 @@ export function IncidentDetail({ id }: { id: string }) {
             )}
             <div className="approval-note">
               <ShieldCheck size={15} />
-              <span>Commands are not applied until you approve.</span>
+              <span>
+                {apiReplay
+                  ? "Saved API replay: approval updates the snapshot only; no router is contacted."
+                  : apiModeKnown
+                    ? "Commands may be applied to the connected router after approval."
+                    : "API mode is unavailable; confirm the service connection before deciding."}
+              </span>
             </div>
             {(canApprove || canReject) && (
               <div className="decision-actions">
@@ -305,7 +332,13 @@ export function IncidentDetail({ id }: { id: string }) {
         open={dialog === "approve"}
         onOpenChange={(v) => !v && setDialog(null)}
         title="Approve this router change?"
-        description="The approved commands will be sent to the network service. You can review the rollback commands above."
+        description={
+          apiReplay
+            ? "This saved replay records the approval in the snapshot. No router is contacted."
+            : !apiModeKnown
+              ? "The API mode could not be confirmed. Review the commands and rollback plan before continuing."
+              : "The approved commands may be applied to the connected router. Review the rollback commands above before continuing."
+        }
         confirmLabel="Approve change"
         onConfirm={decide}
         busy={busy}

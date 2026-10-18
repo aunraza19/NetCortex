@@ -165,10 +165,11 @@ def configure_detector(
         train_labels = [str(label) for label in labels]
         backend.fit_cause_model(train_frame, train_labels)
         backend.fit_anomaly(normal_train_frame)
-        validation_scores = [
-            float(backend.raw_anomaly(pd.Series(row, index=columns)))
-            for row in normal_validation
-        ]
+        validation_vectors = [pd.Series(row, index=columns) for row in normal_validation]
+        if hasattr(backend, "raw_anomaly_batch"):
+            validation_scores = backend.raw_anomaly_batch(validation_vectors)
+        else:
+            validation_scores = [backend.raw_anomaly(vector) for vector in validation_vectors]
         backend.set_anomaly_reference(validation_scores)
     except ModuleUnavailable:
         _prepared = None

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Play, RadioTower } from "lucide-react";
-import { scenarios, sites } from "@/lib/fixtures";
+import { scenarios, sites as fixtureSites } from "@/lib/fixtures";
 import { apiMode, transport } from "@/lib/transport";
 import type { Incident, Scenario } from "@/lib/types";
 import { ErrorBox, SectionTitle } from "./ui";
@@ -27,6 +27,30 @@ export function DemoPanel() {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sites, setSites] = useState(apiMode === "mock" ? fixtureSites : []);
+  const [apiReplay, setApiReplay] = useState(false);
+  const [modeReady, setModeReady] = useState(apiMode === "mock");
+  useEffect(() => {
+    if (apiMode !== "live") return;
+    void Promise.all([transport.health(), transport.sites()])
+      .then(([health, availableSites]) => {
+        setApiReplay(!!health?.demo_mode);
+        setModeReady(!!health);
+        setSites(availableSites);
+        if (
+          !availableSites.some((item) => item.id === site) &&
+          availableSites[0]
+        )
+          setSite(availableSites[0].id);
+      })
+      .catch((cause) =>
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not load network sites.",
+        ),
+      );
+  }, [site]);
 
   const run = async () => {
     setBusy(true);
@@ -53,7 +77,15 @@ export function DemoPanel() {
       <SectionTitle eyebrow="Guided walkthrough" title="Demo panel">
         <span className="demo-badge">
           <span />
-          {apiMode === "mock" ? "Demo: replayed data" : "Live network data"}
+          {apiMode === "mock"
+            ? "Demo: replayed data"
+            : !modeReady
+              ? error
+                ? "API status unavailable"
+                : "Checking API mode"
+              : apiReplay
+                ? "Demo: replayed data"
+                : "Live network data"}
         </span>
       </SectionTitle>
       <div className="demo-layout">
@@ -65,8 +97,11 @@ export function DemoPanel() {
             <div>
               <h2>Replay a network scenario</h2>
               <p>
-                Choose a site and situation to see how NetCortex investigates an
-                incident.
+                {apiReplay
+                  ? "Saved API replay is read only. Scenarios cannot be injected into replay data."
+                  : !modeReady
+                    ? "Scenario actions remain disabled until the API mode is confirmed."
+                    : "Choose a site and situation to see how NetCortex investigates an incident."}
               </p>
             </div>
           </div>
@@ -118,14 +153,21 @@ export function DemoPanel() {
           <div className="demo-safety">
             <CheckCircle2 size={15} />
             <span>
-              This demo uses replayed data. Actions stay in the local simulation
-              and do not reach a router.
+              {apiMode === "mock"
+                ? "This browser demo uses local replay data; actions stay in the simulation."
+                : !modeReady
+                  ? error
+                    ? "API mode could not be confirmed. Scenario actions remain disabled."
+                    : "Checking API mode. Scenario actions remain disabled until the service mode is known."
+                  : apiReplay
+                    ? "This is saved API replay data. Scenario injection is disabled; saved approvals update the replay snapshot only."
+                    : "Scenario injection writes to the simulator. Approving a proposal may run its commands against the connected CHR."}
             </span>
           </div>
           {error && <ErrorBox message={error} />}
           <button
             className="button button-primary inject-button"
-            disabled={busy}
+            disabled={busy || !modeReady || apiReplay || sites.length === 0}
             onClick={() => void run()}
           >
             <Play size={15} fill="currentColor" />

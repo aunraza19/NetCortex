@@ -13,8 +13,8 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useState } from "react";
-import { apiMode } from "@/lib/transport";
+import { useEffect, useState } from "react";
+import { apiMode, transport } from "@/lib/transport";
 const nav = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
@@ -24,6 +24,16 @@ const nav = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<
+    "checking" | "unknown" | "replay" | "live"
+  >(apiMode === "mock" ? "replay" : "checking");
+  useEffect(() => {
+    if (apiMode === "live")
+      void transport
+        .health()
+        .then((health) => setRuntimeMode(health?.demo_mode ? "replay" : "live"))
+        .catch(() => setRuntimeMode("unknown"));
+  }, []);
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
@@ -45,7 +55,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="workspace-select">
           <span className="workspace-dot" />
-          <span>North region</span>
+          <span>
+            {apiMode === "mock" ? "North region" : "Network workspace"}
+          </span>
           <ChevronDown size={14} />
         </div>
         <div className="nav-label">WORKSPACE</div>
@@ -59,7 +71,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               <n.icon size={17} />
               <span>{n.label}</span>
-              {n.label === "Incidents" && <b className="nav-count">2</b>}
+              {n.label === "Incidents" && apiMode === "mock" && (
+                <b className="nav-count">2</b>
+              )}
             </Link>
           ))}
         </nav>
@@ -68,10 +82,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span className="status-orb" />
             <div>
               <strong>
-                {apiMode === "mock" ? "Replay mode" : "API connection"}
+                {runtimeMode === "replay"
+                  ? "Replay mode"
+                  : runtimeMode === "live"
+                    ? "API connection"
+                    : "API status unavailable"}
               </strong>
               <small>
-                {apiMode === "mock" ? "Local fixture data" : "Live service"}
+                {runtimeMode === "replay"
+                  ? apiMode === "mock"
+                    ? "Local fixture data"
+                    : "Saved API snapshot"
+                  : runtimeMode === "live"
+                    ? "Live service"
+                    : "Mode not confirmed"}
               </small>
             </div>
           </div>
@@ -114,11 +138,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="topbar-right">
             <div className="demo-badge">
               <span />
-              {apiMode === "mock" ? "Demo: replayed data" : "Live network data"}
+              {runtimeMode === "replay"
+                ? "Demo: replayed data"
+                : runtimeMode === "live"
+                  ? "Live network data"
+                  : "API status unavailable"}
             </div>
             <div className="live-indicator">
               <span className="pulse" />
-              {apiMode === "mock" ? "Replay" : "Live mode"}
+              {runtimeMode === "replay"
+                ? "Replay"
+                : runtimeMode === "live"
+                  ? "Live mode"
+                  : "Unknown mode"}
             </div>
             <button className="operator-chip">
               <div className="avatar avatar-small">AR</div>
