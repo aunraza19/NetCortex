@@ -32,6 +32,7 @@ The reproducible run creates 80 training, 80 validation and 80 held-out cases,
 with ten per class in each split:
 
 ```powershell
+Copy-Item data/baselines/ripe-pk-2026-10-11--17.json data/calibration.json
 uv run simgen eval-cases --n 80 --seed 1000 --mock
 uv run python eval/run.py --mode mock
 ```
@@ -47,7 +48,11 @@ sidecars, out of detector inputs. Thresholds use validation only. Agent/template
 parameter and real-router metrics remain unavailable until Aun's integration runs.
 Single-snapshot evaluation cannot establish detection delay; replay is required.
 
-Raw/generated files and calibration JSON remain ignored. Committed provenance and
+The frozen aggregate [calibration profile](../data/baselines/ripe-pk-2026-10-11--17.json)
+preserves the exact statistical input used for this run. Copying it as above
+explicitly opts into the narrow role proxy; use `cp` in a POSIX shell. No raw
+measurements are included in the profile. Raw/generated files and the active
+`data/calibration.json` remain ignored. Committed provenance and
 coverage live in [the RIPE summary](../data/ripe-baseline-summary.json) and
 [calibration report](../data/calibration-report.md).
 

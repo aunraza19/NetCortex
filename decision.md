@@ -25,6 +25,7 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Persist decisions, flow documentation and progress handoffs | User wants to understand the code and context must survive compaction | Every package/app has both documents; lead keeps these root documents current |
 | Normalize tracked text to LF | The team develops on Windows and macOS and tests on Linux | Git whitespace checks and generated diffs behave consistently |
 | Do not promise exact 60% compaction in this running session | Exposed agent controls do not set or trigger that threshold | Host compaction remains automatic; handoffs preserve state independently |
+| Preserve a frozen aggregate calibration profile | Seeded evaluation also depends on the baseline statistics | Reproduce the recorded run without committing raw RIPE rows or relying on a moving download window |
 | Require explicit opt-in for RIPE role transfer | Measured root-server routes differ from configured DNS destinations | Transfer can affect public DNS ping baselines only; provenance and uncertainty travel with generated data |
 | Validate quantile layout, forecast time and freshness independently | SDK array shape and future rows can silently corrupt an otherwise plausible forecast | Regression tests cover each horizon, physical bounds, mixed sources and gaps |
 | Treat live decision POST responses as acknowledgements | A workflow can still be applying or rolling back after the HTTP request succeeds | Fetch authoritative incident state and follow SSE updates |
