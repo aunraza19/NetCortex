@@ -90,3 +90,11 @@ Main advanced during verification with Aun's CHR PR #6. The same branch was
 rebased again onto d70f76f and uv lock rerun. Main's four required root files
 remain identical. The combined suite passes 220 offline tests with three live
 tests deselected, including with unmocked Torch imports blocked.
+
+The newly enabled CHR harness exposed a CI topology mismatch: B's boot smoke
+created one NIC with DHCP defaults, while Aun's template tests require the
+three-NIC baseline, static primary route and existing DNS resolver. The workflow
+now uses Aun's canonical start/stop commands and unchanged template harness.
+Credentials are random per job, masked before sharing through GITHUB_ENV, and
+only QEMU logs and the template JSON report are uploaded. Lead acceptance cases
+were written first; a boot-only pass cannot substitute for four restored fixes.

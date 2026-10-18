@@ -27,3 +27,21 @@ Repository instructions can shape Copilot's review, but automatic review still r
 ## Verified implementation run
 
 The corrected [CHR smoke](https://github.com/aunraza19/NetCortex/actions/runs/39131915789) passed on `d60ffac`, including authenticated REST readiness and cleanup. The template job was skipped because Aun's harness is absent. [Python/frontend CI](https://github.com/aunraza19/NetCortex/actions/runs/39131915864) also passed.
+
+## Template job baseline
+
+When Aun's real harness is present, CI boots `infra/chr/chr.py start`, which
+applies the canonical three-NIC baseline in `infra/chr/baseline.rsc`. The
+one-NIC `.github/scripts/chr_bootstrap.py` helper remains only for the separate
+missing-harness smoke job. This preserves the static primary route, backup
+uplink, LAN queues, and DNS baseline required by failover, queue, and resolver
+template checks.
+
+The template job creates a fresh URL-safe password for that job, emits its
+GitHub Actions mask before writing only `CHR_REST_URL`, `CHR_USERNAME`, and
+`CHR_PASSWORD` to `GITHUB_ENV`, and then runs the real harness with its JSON
+report path. Its always-run stop step uses the canonical `chr.py stop` command.
+The uploaded artifacts are restricted to `var/chr/qemu.log` and
+`var/chr/template-results.json`; router disks and environment files are never
+uploaded. `.github/scripts/chr_ci_env.py` has offline tests and no credential
+or file access outside the explicit GitHub environment file.

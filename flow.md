@@ -94,3 +94,9 @@ through core's database pool. Public detect returns a core DetectionResult;
 the runner validates provenance, quantiles and horizons and compares forecast
 row counts. Exit is a sanitized JSON/Markdown report with measured timing and
 an explicit pass or failure. No migrations or live-router operations occur.
+
+The merged CHR template CI path generates a masked job-only router password,
+calls `infra/chr/chr.py start` to provision the canonical three-NIC baseline,
+then runs `infra/chr/test_templates.py` for actual apply/export/rollback checks.
+It retains the QEMU log and structured test report and always calls canonical
+stop. The old one-NIC bootstrap remains a separate missing-harness boot smoke.

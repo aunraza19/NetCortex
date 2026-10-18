@@ -14,8 +14,8 @@
 
 1. Readiness checks only for Aun's `infra/chr/test_templates.py`.
 2. If missing, the template job is skipped and the summary says no CHR/template tests ran. A separate smoke job installs QEMU/the locked workspace, tests B's offline lifecycle code, and boots/provisions the pinned router.
-3. If present, only the real template job runs; it installs QEMU/the locked workspace and boots/provisions one router before invoking Aun's harness. The smoke job stays skipped to avoid a duplicate boot.
-4. Bootstrap downloads and verifies the pinned image, starts QEMU, skips the optional license text display, presses Enter at the continuation prompt, agrees only at the terms prompt, provisions a random admin password over its serial socket, enables REST support, and verifies the authenticated REST resource twice. It sends serial input with a single CR terminator, detects password mismatch errors immediately, preserves additional prompts from a read chunk, and writes the redacted serial transcript after provisioning so REST failures can be debugged. It masks the password before provisioning and exposes `CHR_REST_URL`, `CHR_REST_USERNAME`, and `CHR_REST_PASSWORD` only to subsequent steps through `GITHUB_ENV`.
-5. The real template job runs Aun's harness against `http://127.0.0.1:9180/rest`. On every outcome, the active router job uploads QEMU and sanitized serial logs when available and asks the helper to stop only its own verified QEMU process.
+3. If present, only the real template job runs; it installs QEMU/the locked workspace, writes a fresh masked job password to `GITHUB_ENV`, and starts the canonical `infra/chr/chr.py` router. The smoke job stays skipped to avoid a duplicate boot.
+4. `chr.py start` boots the three-NIC `infra/chr/baseline.rsc` topology. The template job runs Aun's unmodified harness against that primary/backup/LAN and DNS baseline, writing `var/chr/template-results.json`.
+5. On every outcome, the template job attempts `uv run --locked python infra/chr/chr.py stop` and retains only `var/chr/qemu.log` and the harness JSON report when present. The one-NIC bootstrap helper remains only in the missing-harness smoke job.
 
 **Exit:** actual template coverage is reported only when Aun's harness ran. Bootstrap unit tests, boot smoke, job setup, and a missing-harness skip do not count as an actual router/template test pass.

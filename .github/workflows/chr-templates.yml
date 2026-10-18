@@ -7,6 +7,7 @@ on:
       - "packages/**"
       - "templates/routeros/**"
       - "infra/chr/**"
+      - ".github/scripts/chr_ci_env.py"
       - ".github/scripts/chr_bootstrap.py"
       - ".github/workflows/chr-templates.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "templates/routeros/**"
       - "infra/chr/test_templates.py"
       - "infra/chr/**"
+      - ".github/scripts/chr_ci_env.py"
       - ".github/scripts/chr_bootstrap.py"
       - ".github/workflows/chr-templates.yml"
   workflow_dispatch:
@@ -101,20 +103,22 @@ jobs:
       - name: Install locked workspace
         run: uv sync --all-packages --locked
       - name: Offline test bootstrap lifecycle helpers
-        run: uv run --locked pytest .github/tests/test_chr_bootstrap.py
-      - name: Boot, provision, and authenticate to pinned CHR
-        run: uv run --locked python .github/scripts/chr_bootstrap.py start
+        run: uv run --locked pytest .github/tests/test_chr_bootstrap.py .github/tests/test_chr_harness_ci.py
+      - name: Configure isolated CHR credentials
+        run: python .github/scripts/chr_ci_env.py
+      - name: Boot canonical three-NIC CHR baseline
+        run: uv run --locked python infra/chr/chr.py start
       - name: Run Aun's real router template harness
-        run: uv run --locked python infra/chr/test_templates.py
+        run: uv run --locked python infra/chr/test_templates.py --json var/chr/template-results.json
       - name: Keep router diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: chr-diagnostics
           path: |
-            /tmp/netcortex-chr/qemu.log
-            /tmp/netcortex-chr/serial.log
+            var/chr/qemu.log
+            var/chr/template-results.json
           if-no-files-found: ignore
       - name: Stop the isolated router
         if: always()
-        run: python .github/scripts/chr_bootstrap.py cleanup
+        run: uv run --locked python infra/chr/chr.py stop
