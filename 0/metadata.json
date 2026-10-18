@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M58EE63R3R5QAY10GZTVG8W0",
+  "session_id": "88958964-2992-40b7-a2b1-a4d7674680fc",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T21:24:50.1888123Z",
+  "branch": "a/ui",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "services/api/src/netcortex_api/ui/app.js",
+    "services/api/src/netcortex_api/ui/index.html",
+    "services/api/src/netcortex_api/ui/style.css",
+    "services/worker/tests/test_worker.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "d75ea9bd3bef",
+  "checkpoint_transcript_start": 6692,
+  "transcript_lines_at_start": 6692,
+  "compact_transcript_start": 538,
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 21511,
+    "cache_read_tokens": 6407104,
+    "output_tokens": 16067,
+    "api_call_count": 16
+  },
+  "session_metrics": {
+    "turn_count": 21
+  }
+}

@@ -1,0 +1,45 @@
+I tested a/ui end to end: <it worked / these issues: 
+Make the post-apply watch time a setting (default 300 s). For demo recording I'll set it
+to 60 s. Also show "Watching results, verdict at HH:MM" in the UI while verifying, so it
+doesn't look stuck..
+
+1. Fix any issues above, then merge a/ui into main. Also delete infra/render/render.yaml
+   and the web CI job (we're local-demo only). Push main.
+
+2. Honesty audit before the post. List each partner technology and whether it is LIVE in
+   the demo, STUBBED or NOT USED, with evidence: Gemma 4 (agent), EmbeddingGemma +
+   pgvector runbook search (is the index built? does search_runbook return real chunks?),
+   TabPFN second opinion (has it ever answered a real incident?), Temporal, Sentry
+   (gen_ai spans), Tiger Data (TimescaleDB hypertables), SerpApi check_news (is there a
+   key? real or stub?), Entire (checkpoints on our commits?), GitHub Actions.
+   Also list what I would need to do to turn on the stubbed ones, and how long each
+   would take.
+
+3. Draft the DEV post in docs/post/post.md (Markdown, written for humans; writing quality
+   is judged most). Use only facts from this repo, PR descriptions, Sentry traces and our
+   runs; claim only what the audit marks LIVE. Structure:
+   - Title + one-line hook
+   - What NetCortex is and who would pay (small ISPs / gaming cafes, evening complaints)
+   - Demo: [VIDEO PLACEHOLDER] + where screenshots go
+   - How it works: architecture (collector -> TimescaleDB -> rule trigger -> Temporal
+     incident workflow -> Gemma agent with tools -> template-only fixes -> CHR dry run ->
+     human approval -> apply -> verify -> auto-rollback)
+   - Safety design: template-only commands, param validation, CHR dry run, nc-<id> naming,
+     never touching pre-existing config, approval, auto-rollback (tell the real rollback
+     story from trace 5837ffbb...)
+   - Why open models: local Gemma on a Mac mini, privacy, offline, cost; the thinking
+     on/off table (9.0 s vs 33.6 s, accuracy) and the 10/11 reliability result
+   - Data: live collector from a home connection in Pakistan (7 targets incl. a Dubai
+     game server), the 8.8.8.8 vs 1.1.1.1 DNS finding, plus whatever of the partner's
+     RIPE Atlas / simulator work is real
+   - Observability with Sentry: traces, gen_ai spans with token counts, links
+   - Results table (the e2e runs)
+   - Honest limits (simulated incidents, CHR carries no real traffic, TabPFN status,
+     TabPFN-3.5 non-commercial licence if used)
+   - What's next
+   - Built with: partner tech list (LIVE ones only), team: Aun + partner
+   Keep sentences short and plain. Push it.
+
+
+
+also truthfuly list every partner terch we used correctly.
