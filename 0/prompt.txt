@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>bgyko68dz</task-id>
+<tool-use-id>toolu_01WGa3SdZ78259pbDmNWGV6J</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bgyko68dz.output</output-file>
+<status>failed</status>
+<summary>Background command "Start worker with 60 s watch time" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bb6ihvdno</task-id>
+<tool-use-id>toolu_018mMfiQLxk2HHBFTcRYbibd</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bb6ihvdno.output</output-file>
+<status>failed</status>
+<summary>Background command "Start API with 60 s watch time" failed with exit code 127</summary>
+</task-notification>
