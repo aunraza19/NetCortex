@@ -1,4 +1,5 @@
 import re
+import secrets
 from contextlib import nullcontext
 
 import psycopg
@@ -87,17 +88,18 @@ def test_missing_database_url_exits_with_a_message(monkeypatch, capsys):
 
 
 def test_connection_errors_never_print_the_url_or_password(monkeypatch, capsys):
-    url = "postgresql://tsdbadmin:s3cret-pw@abc.tsdb.cloud.timescale.com:34567/tsdb"
+    password = secrets.token_hex(8)  # generated, so no credential-like literal is committed
+    url = f"postgresql://tester:{password}@db.invalid:5432/tsdb"
     monkeypatch.setattr(migrate, "get_settings", lambda: Settings(_env_file=None, database_url=url))
 
     def refuse(conninfo, **kwargs):
-        raise psycopg.OperationalError(f"could not connect using {conninfo} (pw s3cret-pw)")
+        raise psycopg.OperationalError(f"could not connect using {conninfo} (pw {password})")
 
     monkeypatch.setattr(migrate.psycopg, "connect", refuse)
     assert migrate.main([]) == 1
     output = capsys.readouterr()
     assert "Migration failed: OperationalError" in output.err
-    assert "s3cret-pw" not in output.err + output.out
+    assert password not in output.err + output.out
     assert url not in output.err + output.out
 
 

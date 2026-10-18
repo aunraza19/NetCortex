@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     # Routers. Fixes go to CHR unless APPLY_TARGET=real is set explicitly.
     apply_target: Literal["chr", "real"] = "chr"
     chr_rest_url: str | None = None
-    chr_username: str = "admin"
-    chr_password: SecretStr = SecretStr("")
+    chr_username: str | None = None
+    chr_password: SecretStr | None = None
 
     # Live collector
     site_id_live: str = "home-lab"
