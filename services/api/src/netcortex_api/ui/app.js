@@ -139,6 +139,7 @@ async function loadDetail() {
       report ? h("p", { class: "summary" }, report.summary)
              : h("p", { class: "note" }, "The agent is investigating."),
       decision(incident, plan),
+      watching(incident, timeline),
       report && diagnosis(incident, report),
       h("div", { class: "chart", id: "chart" }),
       plan && fixPlan(plan),
@@ -168,6 +169,13 @@ function decision(incident, plan) {
     h("button", { class: "secondary", onclick: decide("reject") }, "Reject"),
   ];
   return h("div", {}, h("div", { class: "actions" }, buttons), note);
+}
+
+function watching(incident, timeline) {
+  if (incident.status !== "verifying") return null;
+  const due = timeline.findLast((event) => event.payload.verdict_at)?.payload.verdict_at;
+  const at = due && new Date(due).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return h("p", { class: "watch" }, at ? `Watching results, verdict at ${at}.` : "Watching results.");
 }
 
 function diagnosis(incident, report) {

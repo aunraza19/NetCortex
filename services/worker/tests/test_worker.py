@@ -90,13 +90,13 @@ def test_concurrent_activities_keep_their_spans_apart(sent):
     assert incident["contexts"]["trace"]["trace_id"] == incident_id.hex
 
 
-def _verify_with(monkeypatch, recovered: bool):
+def _verify_with(monkeypatch, recovered: bool, since_fix=timedelta(minutes=5), applied_at=None):
     opened = NOW - timedelta(minutes=6)
     after = None if recovered else Cause.HEAVY_USER
     data = window([
         (opened - timedelta(minutes=10), opened - timedelta(minutes=4), None),
-        (opened - timedelta(minutes=4), opened + timedelta(minutes=1), Cause.HEAVY_USER),
-        (opened + timedelta(minutes=1), NOW + timedelta(seconds=10), after),
+        (opened - timedelta(minutes=4), NOW - since_fix, Cause.HEAVY_USER),
+        (NOW - since_fix, NOW + timedelta(seconds=10), after),
     ])  # fmt: skip
     detection = detect("sim-tower", window([
         (opened - timedelta(minutes=30), opened - timedelta(minutes=3), None),
@@ -111,7 +111,7 @@ def _verify_with(monkeypatch, recovered: bool):
 
     monkeypatch.setattr(activities.db, "get_pool", lambda settings=None: Pool())
     monkeypatch.setattr(activities.db, "fetch_window", lambda conn, site, start, end: data)
-    return activities._verify("sim-tower", detection, TemplateId.QUEUE_LIMIT, opened)
+    return activities._verify("sim-tower", detection, TemplateId.QUEUE_LIMIT, opened, applied_at)
 
 
 def test_verify_passes_when_latency_drops_after_the_fix(monkeypatch):
@@ -123,6 +123,17 @@ def test_verify_passes_when_latency_drops_after_the_fix(monkeypatch):
 def test_verify_fails_when_latency_stays_high(monkeypatch):
     result = _verify_with(monkeypatch, recovered=False)
     assert not result.improved, result.detail
+
+
+def test_a_short_watch_is_judged_only_on_the_time_since_the_fix(monkeypatch):
+    minute = timedelta(seconds=60)  # VERIFY_WAIT_S=60: the last 2 minutes would mix in pre-fix data
+    mixed = _verify_with(monkeypatch, True, since_fix=minute)
+    clean = _verify_with(monkeypatch, True, since_fix=minute, applied_at=NOW - minute)
+
+    def after(result) -> float:  # "probe:1.1.1.1:rtt_ms: 102.6 -> 24.9 (...)"
+        return float(result.detail.split("-> ")[1].split()[0])
+
+    assert clean.improved and after(clean) < 0.6 * after(mixed)
 
 
 def test_stale_data_skips_detection(monkeypatch):

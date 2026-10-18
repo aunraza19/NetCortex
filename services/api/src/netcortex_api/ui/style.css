@@ -64,6 +64,7 @@ button:focus-visible, a:focus-visible, li[tabindex]:focus-visible { outline: 1px
 .facts dd { margin: 0; }
 ul.plain { margin: 0; padding-left: 18px; }
 .actions { display: flex; gap: 12px; margin-top: 20px; }
+.watch { margin-top: 20px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .ur { font-size: 16px; }
 
 .chart svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
