@@ -24,6 +24,7 @@ class FakeConsole:
         license_prompt: bool = False,
         license_display: bool = False,
         echo_secret: bool = False,
+        password_mismatch: bool = False,
     ) -> None:
         self.buffer = (
             b"Do you want to see the software license? [Y/n]:\n"
@@ -40,7 +41,9 @@ class FakeConsole:
         self.license_display = license_display
         self.display_skipped = False
         self.echo_secret = echo_secret
+        self.password_mismatch = password_mismatch
         self.reject_service_command = False
+        self.raw_sent: list[bytes] = []
 
     def settimeout(self, _timeout: float) -> None:
         pass
@@ -53,6 +56,7 @@ class FakeConsole:
         return result
 
     def sendall(self, data: bytes) -> None:
+        self.raw_sent.append(data)
         value = data.decode().strip("\r\n")
         self.sent.append(value)
         prompts = {
@@ -81,9 +85,12 @@ class FakeConsole:
             self.buffer = b"new password:\n"
         elif value == "test-secret":
             self.secret_count += 1
-            prompt = (
-                b"repeat new password:\n" if self.secret_count == 1 else b"[admin@MikroTik] >\n"
-            )
+            if self.password_mismatch and self.secret_count == 2:
+                prompt = b"Try again, error: New passwords do not match!\nnew password>\n"
+            else:
+                prompt = (
+                    b"repeat new password:\n" if self.secret_count == 1 else b"[admin@MikroTik] >\n"
+                )
             self.buffer = (b"test-secret\r\n" if self.echo_secret else b"") + prompt
         else:
             self.buffer = prompts.get(value, b"")
@@ -130,6 +137,51 @@ class BootstrapTests(unittest.TestCase):
             "prompt",
         )
 
+    def test_serial_lines_use_single_carriage_return_delimiter(self) -> None:
+        class RecordingStream:
+            sent = b""
+
+            def sendall(self, data: bytes) -> None:
+                self.sent = data
+
+        stream = RecordingStream()
+        chr._send_line(stream, "admin")
+        self.assertEqual(stream.sent, b"admin\r")
+
+    def test_serial_reader_preserves_prompt_bytes_after_match(self) -> None:
+        class BufferedPrompts:
+            chunks = [b"login:\r\nnew password>\r\n"]
+
+            def settimeout(self, _timeout: float) -> None:
+                pass
+
+            def recv(self, _size: int) -> bytes:
+                return self.chunks.pop(0) if self.chunks else b""
+
+        stream = BufferedPrompts()
+        pending: list[str] = []
+        transcript: list[str] = []
+        self.assertEqual(
+            chr._recv_until(
+                stream,
+                [("login", chr.re.compile(r"login:[ \t]*\r?$", chr.re.I | chr.re.M))],
+                timeout=1,
+                transcript=transcript,
+                pending=pending,
+            ),
+            "login",
+        )
+        self.assertEqual(
+            chr._recv_until(
+                stream,
+                [("new_password", chr.re.compile(r"new password>[ \t]*\r?$", chr.re.I | chr.re.M))],
+                timeout=1,
+                transcript=transcript,
+                pending=pending,
+            ),
+            "new_password",
+        )
+
     def test_release_is_pinned_to_official_versioned_url(self) -> None:
         self.assertEqual(chr.VERSION, "7.24.5")
         self.assertEqual(
@@ -146,13 +198,19 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("-monitor none", joined)
 
     def test_provision_sets_new_admin_password_and_enables_rest(self) -> None:
-        fake = FakeConsole()
-        with (
-            patch.object(chr.socket, "AF_UNIX", 1, create=True),
-            patch.object(chr.socket, "socket", return_value=fake),
-            patch.object(chr.time, "sleep"),
-        ):
-            chr.provision_console("test-secret", timeout=10)
+        fake = FakeConsole(echo_secret=True)
+        with tempfile.TemporaryDirectory() as temp:
+            diagnostic = Path(temp) / "serial.log"
+            with (
+                patch.object(chr, "SERIAL_LOG_FILE", diagnostic),
+                patch.object(chr.socket, "AF_UNIX", 1, create=True),
+                patch.object(chr.socket, "socket", return_value=fake),
+                patch.object(chr.time, "sleep"),
+            ):
+                chr.provision_console("test-secret", timeout=10)
+            saved = diagnostic.read_text(encoding="utf-8")
+            self.assertIn("[REDACTED]", saved)
+            self.assertNotIn("test-secret", saved)
         self.assertIn("admin", fake.sent)
         self.assertIn("/password", fake.sent)
         self.assertIn("test-secret", fake.sent)
@@ -196,6 +254,23 @@ class BootstrapTests(unittest.TestCase):
                 chr.provision_console("test-secret", timeout=10)
             self.assertNotIn("test-secret", diagnostic.read_text(encoding="utf-8"))
             self.assertIn("[REDACTED]", diagnostic.read_text(encoding="utf-8"))
+
+    def test_password_mismatch_fails_immediately_and_saves_redacted_log(self) -> None:
+        fake = FakeConsole(automatic_password=True, password_mismatch=True, echo_secret=True)
+        with tempfile.TemporaryDirectory() as temp:
+            diagnostic = Path(temp) / "serial.log"
+            with (
+                patch.object(chr, "SERIAL_LOG_FILE", diagnostic),
+                patch.object(chr.socket, "AF_UNIX", 1, create=True),
+                patch.object(chr.socket, "socket", return_value=fake),
+                patch.object(chr.time, "sleep"),
+                self.assertRaisesRegex(chr.BootstrapError, "password confirmation"),
+            ):
+                chr.provision_console("test-secret", timeout=10)
+            self.assertEqual(fake.secret_count, 2)
+            saved = diagnostic.read_text(encoding="utf-8")
+            self.assertIn("New passwords do not match", saved)
+            self.assertNotIn("test-secret", saved)
 
     def test_github_secret_mask_is_emitted_before_it_is_shared(self) -> None:
         with (

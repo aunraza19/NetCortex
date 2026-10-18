@@ -53,7 +53,10 @@ not authenticated/verified. RouterOS and Sentry skills installed/read/applied.
 
 ## Delivery follow-through
 
-Push tested branch, create draft PR with actual checks/gates; observe CI and real
-CHR smoke, repair failures. Add run/PR links to validation docs and final handoff.
+Branch pushed; draft PR https://github.com/aunraza19/NetCortex/pull/1 is open.
+First push CI passed; PR CI exposed a transient rollback assertion. Real CHR
+boot reached login but password confirmation failed, with CRLF double-submit
+visible in the preserved console. Workers are correcting deterministic browser
+clocks and serial CR-only input before rerunning. Observe corrected CI/CHR. Add run/PR links to validation docs and final handoff.
 Copilot automatic review requires Aun admin/eligible plan; do not claim enabled.
 No merge or deployment is authorized/possible without shared code/account access.

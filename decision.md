@@ -32,6 +32,14 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Separate CHR boot smoke from template validation | A real router can boot even while Aun's template harness is absent | CI reports those outcomes separately; no fabricated template pass |
 | Keep the unpatched braces advisory documented | npm proposes an incompatible Next lint downgrade and no patched braces release exists | Production audit is clean; five development audit entries share one advisory |
 
+## Findings from actual GitHub CI
+
+The first Linux CI run passed. The parallel PR run exposed a browser assertion
+against a short-lived fixture state, so tests now control the clock explicitly.
+The first real CHR boot reached RouterOS login and exposed CRLF being treated as
+two Enter keys during password confirmation. The serial helper now submits CR
+and retains redacted diagnostics. Fake-console tests alone did not reveal this.
+
 ## Current external gates
 
 At the final integration refresh, upstream main still contains only README.md. Aun must publish

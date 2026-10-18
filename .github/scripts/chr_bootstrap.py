@@ -154,10 +154,20 @@ def _recv_until(
     patterns: list[tuple[str, re.Pattern[str]]],
     timeout: float,
     transcript: list[str],
+    pending: list[str] | None = None,
 ) -> str:
     deadline = time.monotonic() + timeout
-    buffer = ""
+    pending = pending if pending is not None else []
+    buffer = "".join(pending)
+    pending.clear()
     while time.monotonic() < deadline:
+        for label, pattern in patterns:
+            match = pattern.search(buffer)
+            if match:
+                remainder = buffer[match.end() :]
+                if remainder:
+                    pending.append(remainder)
+                return label
         stream.settimeout(min(1.0, max(0.1, deadline - time.monotonic())))
         try:
             chunk = stream.recv(4096)
@@ -169,7 +179,11 @@ def _recv_until(
         buffer += decoded
         transcript.append(decoded)
         for label, pattern in patterns:
-            if pattern.search(buffer):
+            match = pattern.search(buffer)
+            if match:
+                remainder = buffer[match.end() :]
+                if remainder:
+                    pending.append(remainder)
                 return label
         if len(buffer) > 16000:
             buffer = buffer[-8000:]
@@ -177,17 +191,26 @@ def _recv_until(
 
 
 def _send_line(stream: socket.socket, line: str) -> None:
-    stream.sendall(line.encode("utf-8") + b"\r\n")
+    stream.sendall(line.encode("utf-8") + b"\r")
 
 
 def provision_console(password: str, timeout: int = 120) -> None:
     """Set the first-login admin password and enable HTTP REST for loopback CI."""
     deadline = time.monotonic() + timeout
     transcript: list[str] = []
+    pending: list[str] = []
     patterns = [
         (
             "command_error",
             re.compile(r"(?:bad command name|expected end of command|syntax error|failure:)", re.I),
+        ),
+        (
+            "password_error",
+            re.compile(
+                r"(?:new passwords? do not match|passwords? do not match|"
+                r"incorrect password|wrong password)",
+                re.I,
+            ),
         ),
         (
             "license_display",
@@ -195,7 +218,7 @@ def provision_console(password: str, timeout: int = 120) -> None:
         ),
         (
             "license_continue",
-            re.compile(r"press (?:the )?enter to continue\s*:?", re.I),
+            re.compile(r"press (?:the )?enter to continue[ \t]*:?", re.I),
         ),
         (
             "license_agreement",
@@ -205,12 +228,15 @@ def provision_console(password: str, timeout: int = 120) -> None:
                 re.I,
             ),
         ),
-        ("login", re.compile(r"login:\s*$", re.I | re.M)),
-        ("repeat_password", re.compile(r"repeat(?:\s+new)? password:?\s*>?\s*$", re.I | re.M)),
-        ("new_password", re.compile(r"new password:?\s*>?\s*$", re.I | re.M)),
-        ("current_password", re.compile(r"current password:?\s*>?\s*$", re.I | re.M)),
-        ("password", re.compile(r"(?:^|\n)password:\s*$", re.I | re.M)),
-        ("prompt", re.compile(r"\[[^\]]+\]\s*(?:/[^\r\n]*)?[>#]\s*$", re.M)),
+        ("login", re.compile(r"login:[ \t]*\r?$", re.I | re.M)),
+        (
+            "repeat_password",
+            re.compile(r"repeat(?:\s+new)? password:?[ \t]*>?[ \t]*\r?$", re.I | re.M),
+        ),
+        ("new_password", re.compile(r"new password:?[ \t]*>?[ \t]*\r?$", re.I | re.M)),
+        ("current_password", re.compile(r"current password:?[ \t]*>?[ \t]*\r?$", re.I | re.M)),
+        ("password", re.compile(r"(?:^|\n)password:[ \t]*\r?$", re.I | re.M)),
+        ("prompt", re.compile(r"\[[^\]]+\][ \t]*(?:/[^\r\n]*)?[>#][ \t]*\r?$", re.M)),
     ]
     try:
         while time.monotonic() < deadline:
@@ -240,9 +266,11 @@ def provision_console(password: str, timeout: int = 120) -> None:
                 remaining = max(1, int(deadline - time.monotonic()))
                 # TCG can take longer than 20 seconds to reach the first login prompt.
                 # Keep waiting, but never extend beyond the caller's overall deadline.
-                prompt = _recv_until(stream, patterns, remaining, transcript)
+                prompt = _recv_until(stream, patterns, remaining, transcript, pending)
                 if prompt == "command_error":
                     raise BootstrapError("RouterOS rejected a serial provisioning command")
+                if prompt == "password_error":
+                    raise BootstrapError("RouterOS rejected admin password confirmation")
                 if prompt == "license_display" and not sent_license_display:
                     _send_line(stream, "n")
                     sent_license_display = True
@@ -287,9 +315,12 @@ def provision_console(password: str, timeout: int = 120) -> None:
 
             for command in ("/ip service set [find name=www] disabled=no rest-plain=yes",):
                 _send_line(stream, command)
-                outcome = _recv_until(stream, patterns[:1] + [patterns[-1]], 15, transcript)
+                outcome = _recv_until(
+                    stream, patterns[:2] + [patterns[-1]], 15, transcript, pending
+                )
                 if outcome == "command_error":
                     raise BootstrapError("RouterOS rejected the www REST service configuration")
+            _write_serial_diagnostics(transcript, password)
     except BootstrapError:
         _write_serial_diagnostics(transcript, password)
         raise

@@ -1,5 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+
+async function installPausedClock(page: Page) {
+  const start = new Date("2026-10-18T00:00:00.000Z");
+  await page.clock.install({ time: start });
+  await page.clock.pauseAt(new Date(start.getTime() + 1_000));
+}
 
 test("overview and site layout render at desktop and phone widths", async ({
   page,
@@ -43,12 +49,17 @@ test("approval needs confirmation and visibly simulates each stage", async ({
   await page.getByRole("button", { name: "Go back" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.getByRole("button", { name: "Approve change" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await installPausedClock(page);
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Approve change" })
     .dblclick();
+  await page.clock.runFor(350);
   await expect(page.getByText("applying", { exact: true })).toBeVisible();
+  await page.clock.runFor(500);
   await expect(page.getByText("verifying", { exact: true })).toBeVisible();
+  await page.clock.runFor(600);
   await expect(page.getByText("resolved", { exact: true })).toBeVisible();
 });
 
@@ -109,12 +120,17 @@ test("an approved backup failover can simulate rollback", async ({ page }) => {
   await page.getByRole("button", { name: "Replay scenario" }).click();
   await page.getByRole("link", { name: "Open incident" }).click();
   await page.getByRole("button", { name: "Approve change" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await installPausedClock(page);
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Approve change" })
     .click();
+  await page.clock.runFor(350);
   await expect(page.getByText("applying", { exact: true })).toBeVisible();
+  await page.clock.runFor(500);
   await expect(page.getByText("verifying", { exact: true })).toBeVisible();
+  await page.clock.runFor(600);
   await expect(page.getByText("rolled back", { exact: true })).toBeVisible();
 });
 
