@@ -1,0 +1,50 @@
+{
+  "source": "RIPE Atlas public API",
+  "downloaded_at": "2026-10-18T12:56:57.886439+00:00",
+  "requested_days": 7,
+  "rows": 11819,
+  "probe_count": 3,
+  "asn_count": 3,
+  "measurement_ids": [
+    1001,
+    1004
+  ],
+  "probes": [
+    {
+      "id": 7613,
+      "asn": 152605
+    },
+    {
+      "id": 7764,
+      "asn": 17557
+    },
+    {
+      "id": 7812,
+      "asn": 138910
+    }
+  ],
+  "targets": [
+    "192.5.5.241",
+    "193.0.14.129"
+  ],
+  "first_observation": "2026-10-11T00:00:26+00:00",
+  "last_observation": "2026-10-17T23:59:48+00:00",
+  "failures": [
+    {
+      "measurement": 1004,
+      "start": 1791849600,
+      "error": "TimeoutError"
+    },
+    {
+      "measurement": 1004,
+      "start": 1792022400,
+      "error": "TimeoutError"
+    },
+    {
+      "measurement": 1004,
+      "start": 1792108800,
+      "error": "TimeoutError"
+    }
+  ],
+  "limits": "Root DNS-server ping reachability only; not DNS resolution time. No gateway, game-server or subscriber baseline. Raw records ignored by Git."
+}

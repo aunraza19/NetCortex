@@ -1,0 +1,26 @@
+timezone: Asia/Karachi
+sites:
+  - id: north-tower
+    name: North Tower
+    subscribers: 120
+    uplinks:
+      - {interface: ether1, role: primary, capacity_mbps: 180}
+    backup_uplink: {interface: ether2, role: backup, capacity_mbps: 80}
+    backhauls: [{interface: wlan1, role: backhaul, capacity_mbps: 120}]
+    targets: [gateway, upstream-hop, 1.1.1.1, 8.8.8.8, regional-game]
+  - id: market-cafe
+    name: Market Cafe
+    subscribers: 48
+    uplinks:
+      - {interface: ether1, role: primary, capacity_mbps: 100}
+    backup_uplink: null
+    backhauls: [{interface: wlan1, role: backhaul, capacity_mbps: 80}]
+    targets: [gateway, upstream-hop, 1.1.1.1, 8.8.8.8, regional-game]
+  - id: east-relay
+    name: East Relay
+    subscribers: 165
+    uplinks:
+      - {interface: ether1, role: primary, capacity_mbps: 250}
+    backup_uplink: {interface: ether2, role: backup, capacity_mbps: 100}
+    backhauls: [{interface: wlan1, role: backhaul, capacity_mbps: 150}, {interface: wlan2, role: backhaul, capacity_mbps: 100}]
+    targets: [gateway, upstream-hop, 1.1.1.1, 8.8.8.8, regional-game]

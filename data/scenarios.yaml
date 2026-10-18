@@ -1,0 +1,8 @@
+scenarios:
+  uplink_congestion: {evidence: "primary uplink utilization high; external targets degrade while gateway stays healthy", template: priority_queue}
+  heavy_user: {evidence: "experimental subscriber telemetry only; no core subscriber schema is defined", template: queue_limit}
+  upstream_degradation: {evidence: "external targets degrade while gateway and utilization remain normal", template: none}
+  game_route_issue: {evidence: "regional game target alone degrades", template: none}
+  wireless_interference: {evidence: "experimental backhaul loss and jitter; no core role mapping is defined", template: none}
+  uplink_down: {evidence: "primary uplink fails; failover is actionable only where backup exists", template: failover_route}
+  dns_slow: {evidence: "experimental DNS resolution timing only; core probe schema has no resolver timing field", template: dns_servers}
