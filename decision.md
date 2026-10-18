@@ -16,7 +16,7 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Failure is unavailable, never an implicit normal result | A failed diagnostic must not tell the operator a broken network is healthy | Provider errors stay visible; live transport never silently falls back to fixtures |
 | Use TabPFN Python adapters in the application; MCP only for experiments | The detector needs a stable callable and explicit configuration | Connecting an MCP does not replace the runtime integration |
 | Use Render Node hosting for the Next.js dashboard | SSR routes and dynamic incident URLs require the actual Next server | Static `dist` hosting is unsuitable for this application |
-| Keep the API deployment gated on Aun's backend | Creating a second backend would break ownership and integration | Infrastructure docs may be ready before a public complete demo |
+| Host the merged API in DEMO_MODE alongside the Next.js dashboard on Render | The saved replay API is part of Aun's merged contract and needs no DB/model/router on Render | Public browser origins need CORS and a confirmed .tech domain; deploy only on free services |
 | Use free tiers and credits only | User's chosen spending limit | Any purchase or paid upgrade needs separate authorization |
 | Add the MIT license specified in Aun's brief | The challenge plan explicitly requires MIT-licensed project code | Third-party model/data licenses still apply separately |
 | Enable Entire before the first implementation commit | Capture coding provenance required by the brief | Hook installation is verified separately from transcript/checkpoint capture |
@@ -31,6 +31,10 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Treat live decision POST responses as acknowledgements | A workflow can still be applying or rolling back after the HTTP request succeeds | Fetch authoritative incident state and follow SSE updates |
 | Separate CHR boot smoke from template validation | A real router can boot even while Aun's template harness is absent | CI reports those outcomes separately; no fabricated template pass |
 | Keep the unpatched braces advisory documented | npm proposes an incompatible Next lint downgrade and no patched braces release exists | Production audit is clean; five development audit entries share one advisory |
+| Use core Cause, PROBE_COLUMNS, IFACE_COLUMNS, and get_settings() in the detector | Shared contracts are merged and Settings is cached/configured centrally | Required detector observations are selected from those shared columns; optional core fields remain optional for lower-level legacy inputs |
+| Make Gemma investigation and CHR dry-run explicit eval CLI options | Default scoring remains reproducible and offline; these steps need external model/router services | `--with-agent` calls the merged agent and fixes validator; `--chr-dry-run` additionally applies and rolls back on configured CHR |
+| Use one phone-sized API browser project for approve-flow verification | The saved API fixture contains one pending approval that is consumed by approval | The Pixel 7 run exercises the actual REST approval through resolved state |
+| Restore only non-voice partner plan rows and hosted-demo limits | Voice was dropped, while SerpApi, partner hardware, and TabPFN caveats remain in scope | Plan and implementation boundaries stay consistent |
 
 ## Findings from actual GitHub CI
 
@@ -140,3 +144,21 @@ including real REST decisions against an in-memory pending snapshot incident.
 This tests the HTTP integration without claiming a local Temporal/router run.
 The credentialed SQL check rolls back all test writes. Real-provider diagnostics
 are captured privately and sanitized; no current transcript is published.
+
+## Current review follow-up
+
+The branch now includes the latest `main` merge and a regenerated `uv.lock`.
+The saved-run API approve flow passes in Playwright at Pixel 7 dimensions. The
+real API host on Aun's laptop was not reachable from this machine, so the check
+used its merged `DEMO_MODE=true` DemoStore path. The Render blueprint now defines
+both the UI and saved-snapshot API as free web services; adding the actual `.tech`
+hostname and CORS origin requires the domain and Render/DNS account access.
+
+The detector now gets settings from `get_settings()` and uses core Cause and
+metric-column contracts. The four requested detector files were formatted.
+`eval/run.py --with-agent` uses the merged async investigator and fix validator;
+`--chr-dry-run` opts into applying and rolling back on the configured test CHR.
+The complete offline suite passes after updating settings mocks. The public
+credential scan reports generic-key matches in historical Entire transcript
+objects; the known TabPFN key prefix and provider key names were absent from the
+redacted scan metadata, and new edits are scanned before pushing.

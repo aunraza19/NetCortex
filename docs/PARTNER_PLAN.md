@@ -68,6 +68,8 @@ NetCortex watches a small network, warns before customers start complaining, exp
 - **Cost:** no per-token bills, so a small ISP can afford it.
 - **Control:** we can swap models, fine-tune for RouterOS, and constrain the agent's output.
 
+**Honest limits to state in the post:** TabPFN-3.5's cloud API sends anonymised metrics out, and its free license is non-commercial (a paid product would need a commercial license). Cloud add-ons (SerpApi and TabPFN cloud) are optional switches. The hosted demo uses replayed and simulated data.
+
 
 **Vendor scope:** MikroTik RouterOS only. It is common among small ISPs and has a free virtual router image (CHR) we can test on. Cisco is out of scope.
 
@@ -103,6 +105,7 @@ Two people on two networks. Tailscale joins the machines into one private networ
 | --- | --- | --- | --- |
 | Aun | Mac mini M4 | 16 GB RAM, 256 GB disk | Ollama: Gemma 4 E4B (agent) and EmbeddingGemma (embeddings), shared over Tailscale |
 | Aun | Laptop | Intel i7 10th gen, 32 GB RAM, NVIDIA Quadro P520 4 GB | Docker: Temporal dev server, MikroTik CHR virtual router (QEMU), FastAPI, Temporal workers, live collector. This is the integration host. |
+| Partner | PC | NVIDIA GTX 1660 6 GB, 16 GB RAM | Simulator, detector, docs indexer, news module, web UI, CI and deployment. Local TabPFN and EmbeddingGemma. |
 
 **Shared services:**
 
@@ -151,6 +154,7 @@ Aun builds everything that needs his hardware, the router or the runtime glue. T
 | B2 Datasets + simulator | Real data ingest (RIPE Atlas, live collector export), simulator, scenarios, labels, network layout, eval set | `packages/simgen`, `data/`, `eval/` |
 | B3 Detector | TabPFN forecasting, anomaly score, cause classifier → `detect()` | `packages/detector` |
 | B4 Docs search | MikroTik docs → chunks → EmbeddingGemma → pgvector → `search_runbook()` | `packages/runbook` |
+| B5 Side modules | `check_news()` with SerpApi | `packages/notify` |
 | B6 Web UI | Next.js dashboard, mobile-first, mock mode first | `apps/web` |
 | B7 Hosted demo | Render + .tech domain, demo mode with replay | `infra/render` |
 | B8 CI | GitHub Actions: lint, tests, CHR template tests; Copilot PR review | `.github/workflows` |
@@ -190,6 +194,7 @@ netcortex/
   packages/fixes/           fix checker                        (Aun)
   packages/detector/        TabPFN detection                   (Partner)
   packages/runbook/         docs ingest + search               (Partner)
+  packages/notify/          SerpApi outage checks               (Partner)
   packages/simgen/          simulator + data tools             (Partner)
   templates/routeros/       fix templates (YAML)               (Aun)
   data/                     small fixtures, sites.yaml, scenario catalog (Partner)

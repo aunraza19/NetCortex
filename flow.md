@@ -29,6 +29,14 @@ flowchart TD
     IW --> VERIFY[Apply on demo CHR and verify]
     VERIFY --> END[Resolved or rolled back]
     END --> API
+    CASES[Eval TRAIN / VALIDATION / TEST] --> EVAL[eval/run.py]
+    EVAL --> DET[Detector result mapped to core DetectionResult]
+    DET --> INV[netcortex_agent.investigate]
+    INV --> VAL[netcortex_fixes.validate]
+    VAL --> CHR[Optional netcortex_fixes.dry_run on CHR]
+    CHR --> REPORT[Eval measurements and denominators]
+    SNAP[Saved real-run snapshot] --> DEMO[API DemoStore, DEMO_MODE=true]
+    DEMO <--> UI
 ```
 
 ## Entry and exit points
@@ -44,16 +52,17 @@ flowchart TD
 | `check_news(provider, target)` | upstream provider/target | Recent SerpApi search | Shared NewsCheck with links; explicit unavailable summary on failure |
 | Dashboard navigation | site/incident selection | Fixture transport or Aun's HTTP API | Rendered status/evidence, loading state or visible error |
 | Dashboard decision | confirmed approve/reject | POST to Aun; GET authoritative incident after acknowledgement; workflow owns subsequent state | Acknowledged decision, followed by SSE/refetch; no assumed live success |
-| Evaluation runner | held-out case directory and mode | Detector, then Aun's agent/checker when available | Markdown/structured results with actual measurements and pending gates |
+| Evaluation runner | `eval/run.py --mode mock|cloud|local`; optional `--with-agent`, `--chr-dry-run` | TEST detector output -> core `DetectionResult` and case `MetricsWindow` -> merged async investigator -> `validate`; optional configured CHR `dry_run` | Markdown with actual scores and denominators; agent/parameter/CHR metrics stay unavailable unless those integrations ran |
 
 ## HTTP boundary owned by Aun
 
-The draft API exposes `GET /sites`, `/metrics`, `/incidents`,
-`POST /incidents/{id}/approve`, `/incidents/{id}/reject`, and
-`POST /demo/scenarios`. Actual response types will come from Aun's API OpenAPI when published.
-SSE event names are `metric`, `incident.opened`, `incident.updated`, `fix.tested`
-and `fix.applied`. Reconnect must refresh state; repeated event IDs must not
-repeat effects. Settings reads/writes are a pending contract.
+The merged API exposes `GET /health`, `/sites`, `/metrics`, `/incidents`,
+`/incidents/{id}`, `POST /incidents/{id}/approve`, `/incidents/{id}/reject`,
+`POST /demo/scenarios`, `GET /stream`, and `/openapi.json`. The UI's generated
+types are in `apps/web/lib/generated/openapi.ts`. SSE event names are `metric`,
+`incident.opened`, `incident.updated`, `fix.tested` and `fix.applied`. Reconnect
+refreshes state; approve/reject acknowledgements are followed by authoritative
+GET/SSE state rather than assumed completion.
 
 ## Fixture and live exits
 
@@ -65,8 +74,11 @@ passing CHR check and an appropriate incident state.
 
 ## Hosting and validation boundary
 
-Render runs the dashboard's Node/Next.js server. Aun supplies the API service;
-the browser does not hold database or provider secrets. Sentry receives optional
+Render runs the dashboard's Node/Next.js server and merged FastAPI replay service
+with `DEMO_MODE=true`; the browser does not hold database or provider secrets.
+The web service calls the API's public Render URL. The API allows its web origin
+through CORS. Custom `.tech` domain attachment and DNS verification require the
+domain name and Render/DNS account access. Sentry receives optional
 frontend monitoring when configured. CI checks offline Python/frontend behavior;
 the separate CHR workflow boots a pinned router and checks authenticated REST.
 Its template job runs only when Aun's actual test harness exists; boot success
@@ -83,8 +95,11 @@ DetectionResult with canonical SeriesForecast/ForecastPoint data. detect perform
 no forecast writes; MonitorSiteWorkflow owns persistence. Core exposes fetch_site.
 
 The detector needs an explicitly prepared real TabPFN context for cloud/local
-inference. Gate 2 will prepare it from TRAIN and normal VALIDATION observations,
-without reading TEST labels at inference. Provider failures remain unavailable.
+inference. `prepare_detector()` reads TRAIN and normal VALIDATION observations,
+without reading TEST labels. `configure_detector()` fits provider state once at
+worker startup. A full-series cloud run measured 99.1 seconds for setup and 62.1
+seconds for detect; these numbers establish integration timing for that run only.
+Provider failures remain unavailable.
 
 Gate 2 entry is `python eval/gate2.py`. It calls `prepare_detector(cases, artifact)`
 for TRAIN/VALIDATION JSON and Parquet, then `configure_detector(artifact)` to fit
