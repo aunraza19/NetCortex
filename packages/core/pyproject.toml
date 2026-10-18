@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netcortex-core"
+version = "0.1.0"
+description = "Shared schemas, settings, module interfaces and database access for NetCortex"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.12,<3",
+    "pydantic-settings>=2.9,<3",
+    "pandas>=2.3",
+    "psycopg[binary]>=3.2,<4",
+    "psycopg-pool>=3.2,<4",
+]
+
+[project.scripts]
+netcortex-migrate = "netcortex_core.migrate:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netcortex_core"]
