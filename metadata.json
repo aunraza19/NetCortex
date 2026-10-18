@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M585ZWS547RXB8BKG3Q6BE9F",
+  "strategy": "manual-commit",
+  "branch": "a/runtime",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "infra/scripts/e2e.py",
+    "packages/core/src/netcortex_core/db.py",
+    "packages/core/tests/test_core_db.py",
+    "services/worker/src/netcortex_worker/activities.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 8993,
+    "cache_read_tokens": 5196955,
+    "output_tokens": 6659,
+    "api_call_count": 8
+  }
+}
