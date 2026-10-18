@@ -12,3 +12,11 @@ The offline acceptance tests cover workflow ordering, the always-run cleanup,
 artifact allowlisting, and credential masking/environment-file output. No local
 QEMU, router, or credentialed service was used for this change; the real CHR
 template job remains the external integration check.
+
+The user's refresh sequence was executed on b/workstream-b: save the fix as wip,
+fetch origin, merge origin/main (already included), restore main's pyproject.toml,
+.gitignore, LICENSE, .gitattributes and uv.lock, then run uv lock, uv sync
+--all-packages and uv run pytest -m "not live". All 222 selected tests passed;
+three live tests were deselected. Regenerating from main reproduced the existing
+B lockfile, so there is no effective lockfile diff and no extra merge commit.
+Main's four required root files remain byte-identical.
