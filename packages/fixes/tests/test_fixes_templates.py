@@ -1,6 +1,8 @@
+from uuid import UUID
+
 import pytest
 from netcortex_core import Cause, TemplateId
-from netcortex_fixes import ParamError, load_templates, render, templates_for, validate
+from netcortex_fixes import ParamError, load_templates, render, tag_for, templates_for, validate
 
 VALID = {
     "queue_limit": {"target": "10.0.0.42", "upload_mbps": 2, "download_mbps": 10},
@@ -44,7 +46,17 @@ def test_valid_params_render_apply_and_rollback(template_id):
 def test_rendered_commands_contain_only_validated_values():
     apply, rollback = render("queue_limit", {**VALID["queue_limit"], "target": "10.0.0.40/29"})
     assert "target=10.0.0.40/29 max-limit=2M/10M" in apply
-    assert 'name="netcortex-limit-10.0.0.40_29"' in rollback
+    assert 'name="nc-test-limit-10.0.0.40_29"' in rollback
+
+
+def test_object_names_carry_the_incident_tag():
+    incident_id = UUID("1a2b3c4d-0000-4000-8000-000000000000")
+    assert tag_for(incident_id) == "nc-1a2b3c4d"
+    for template_id in VALID:
+        apply, rollback = render(template_id, VALID[template_id], tag_for(incident_id))
+        assert "netcortex" not in apply + rollback
+    with pytest.raises(ParamError, match="bad tag"):
+        render("queue_limit", VALID["queue_limit"], tag='x"; /system reset')
 
 
 def test_defaults_are_filled_in():

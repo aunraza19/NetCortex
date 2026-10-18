@@ -20,15 +20,15 @@ from netcortex_fixes import RouterClient, RouterError, dry_run, load_templates
 SAMPLES = {
     TemplateId.QUEUE_LIMIT: (
         {"target": "10.0.0.42", "upload_mbps": 5, "download_mbps": 10},
-        ["+/queue simple add", "name=netcortex-limit-10.0.0.42", "max-limit=5M/10M"],
+        ["+/queue simple add", "name=nc-test-limit-10.0.0.42", "max-limit=5M/10M"],
     ),
     TemplateId.FAILOVER_ROUTE: (
         {"primary_gateway": "10.0.2.2", "backup_gateway": "192.0.2.1"},
-        ["check-gateway=ping", "gateway=192.0.2.1", "netcortex:failover_route"],
+        ["check-gateway=ping", "gateway=192.0.2.1", "nc-test:failover_route"],
     ),
     TemplateId.PRIORITY_QUEUE: (
         {"uplink": "ether1", "uplink_mbps": 90},
-        ["new-packet-mark=netcortex-priority", "name=netcortex-uplink", "packet-mark=no-mark"],
+        ["new-packet-mark=nc-test-priority", "name=nc-test-uplink", "packet-mark=no-mark"],
     ),
     TemplateId.DNS_SERVERS: (
         {"servers": ["1.1.1.1", "8.8.8.8"]},

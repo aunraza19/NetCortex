@@ -20,15 +20,15 @@ params:
 # Shapes upload on the uplink interface. Packets are marked in prerouting, so marks apply
 # to traffic from the LAN towards the uplink.
 apply: |
-  /ip firewall mangle add chain=prerouting protocol=udp dst-port=53 action=mark-packet new-packet-mark=netcortex-priority passthrough=no comment="netcortex:priority_queue"
-  /ip firewall mangle add chain=prerouting protocol=udp dst-port={{ game_ports }} action=mark-packet new-packet-mark=netcortex-priority passthrough=no comment="netcortex:priority_queue"
-  /queue tree add name=netcortex-uplink parent={{ uplink }} max-limit={{ uplink_mbps }}M comment="netcortex:priority_queue"
-  /queue tree add name=netcortex-priority parent=netcortex-uplink packet-mark=netcortex-priority priority=1 comment="netcortex:priority_queue"
-  /queue tree add name=netcortex-bulk parent=netcortex-uplink packet-mark=no-mark priority=8 comment="netcortex:priority_queue"
+  /ip firewall mangle add chain=prerouting protocol=udp dst-port=53 action=mark-packet new-packet-mark={{ tag }}-priority passthrough=no comment="{{ tag }}:priority_queue"
+  /ip firewall mangle add chain=prerouting protocol=udp dst-port={{ game_ports }} action=mark-packet new-packet-mark={{ tag }}-priority passthrough=no comment="{{ tag }}:priority_queue"
+  /queue tree add name={{ tag }}-uplink parent={{ uplink }} max-limit={{ uplink_mbps }}M comment="{{ tag }}:priority_queue"
+  /queue tree add name={{ tag }}-priority parent={{ tag }}-uplink packet-mark={{ tag }}-priority priority=1 comment="{{ tag }}:priority_queue"
+  /queue tree add name={{ tag }}-bulk parent={{ tag }}-uplink packet-mark=no-mark priority=8 comment="{{ tag }}:priority_queue"
 rollback: |
-  /queue tree remove [find parent="netcortex-uplink"]
-  /queue tree remove [find name="netcortex-uplink"]
-  /ip firewall mangle remove [find comment="netcortex:priority_queue"]
+  /queue tree remove [find parent="{{ tag }}-uplink"]
+  /queue tree remove [find name="{{ tag }}-uplink"]
+  /ip firewall mangle remove [find comment="{{ tag }}:priority_queue"]
 verify:
   metric: rtt_ms
   goal: decrease

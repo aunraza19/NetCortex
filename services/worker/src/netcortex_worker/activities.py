@@ -197,6 +197,7 @@ def _check_fix(incident_id: UUID, site_id: str, template_id: TemplateId, params:
             site_id,
             fix_plan_id=str(plan.id),
             dry_run_ok=plan.dry_run_ok,
+            reason=fixes.failure_reason(plan),
         )
     return plan
 
