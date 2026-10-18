@@ -81,6 +81,7 @@ class RunStats:
     seconds: float = 0.0
     tool_calls: list[str] = field(default_factory=list)
     output_retries: int = 0
+    retry_reasons: list[str] = field(default_factory=list)  # what the model was told to fix
     fell_back: bool = False
 
 
@@ -219,6 +220,7 @@ def _stats(messages: list[ModelMessage], started: float) -> RunStats:
                     stats.tool_calls.append(part.tool_name)
             elif isinstance(part, RetryPromptPart) and part.tool_name in (None, "final_result"):
                 stats.output_retries += 1
+                stats.retry_reasons.append(str(part.content)[:300])
     return stats
 
 

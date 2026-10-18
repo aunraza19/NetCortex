@@ -49,6 +49,8 @@ async def main(runs: int) -> None:
                     flush=True,
                 )
                 print(f"    params={report.template_params} summary={report.summary!r}")
+                for reason in stats.retry_reasons:
+                    print(f"    retry: {reason}")
     print()
     for thinking in (False, True):
         mine = [r for r in rows if r[0] == thinking]

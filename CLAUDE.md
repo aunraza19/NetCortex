@@ -25,10 +25,10 @@
 | Machine | Role | Status |
 |---|---|---|
 | Laptop (this machine): i7 10th gen, 32 GB RAM, Quadro P520 4 GB | Integration host. All code runs here: Docker, Temporal, CHR, API, workers, collector. | Active. Claude Code in VS Code. |
-| Mac mini M4, 16 GB (office machine) | **Model server only.** Ollama with `gemma4:e4b` (agent) and `embeddinggemma` (embeddings). `OLLAMA_HOST=0.0.0.0`, `OLLAMA_KEEP_ALIVE=24h`. **No git, no repo, no code runs there.** | `gemma4:e4b` downloading (about 3 h). Until it's ready, build the agent with Pydantic AI `TestModel`. |
+| Mac mini M4, 16 GB | **Model server only.** Ollama with `gemma4:e4b` (agent) and `embeddinggemma` (embeddings). `OLLAMA_HOST=0.0.0.0`, `OLLAMA_KEEP_ALIVE=24h`. **No git, no repo, no code runs there.** | Ready. On the same Wi-Fi as the laptop, reached over the LAN (no Tailscale). Its DHCP address changed once (192.168.1.5 → .6); if the agent can't connect, check `OLLAMA_BASE_URL` in `.env`. |
 | Partner PC: GTX 1660 6 GB, 16 GB RAM, remote | Workstream B via Codex. Runs his own local Ollama for embeddings, plus Gemma 4 E2B/E4B for development. | Working from `docs/PARTNER_PLAN.md`, against the draft contracts. **Needs `packages/core` merged ASAP.** |
 
-- **Networking:** Tailscale joins the laptop and Mac (Aun's tailnet). The Mac is shared with the partner.
+- **Networking:** the laptop and Mac share the home Wi-Fi, so the laptop uses the Mac's LAN address (Tailscale isn't installed on the laptop). The partner reaches the Mac through Tailscale.
 - **Fallback:** if Tailscale fails, pull the partner's code from GitHub and run everything on the laptop. The laptop reaches the Mac over the home LAN.
 - **Database:** Tiger Cloud (TimescaleDB + pgvector), shared by both people.
 

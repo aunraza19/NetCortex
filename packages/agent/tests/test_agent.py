@@ -64,6 +64,7 @@ def test_invalid_template_gets_one_retry_with_the_error_fed_back():
     assert stats.output_retries == 1 and not stats.fell_back
     retry = [p for p in requests[1][-1].parts if isinstance(p, RetryPromptPart)][0]
     assert "not allowed for cause 'heavy_user'" in str(retry.content)
+    assert "not allowed for cause 'heavy_user'" in stats.retry_reasons[0]
 
 
 def test_bad_params_twice_falls_back_to_template_none():
