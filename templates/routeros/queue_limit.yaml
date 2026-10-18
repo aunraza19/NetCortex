@@ -10,12 +10,12 @@ params:
     type: int
     min: 1
     max: 1000
-    description: Upload cap in Mbit/s.
+    description: Upload cap in Mbit/s. A fair cap is about 5% of the uplink capacity.
   download_mbps:
     type: int
     min: 1
     max: 1000
-    description: Download cap in Mbit/s.
+    description: Download cap in Mbit/s, well below the user's current rate. A fair cap is about 10% of the uplink capacity.
 # A new simple queue is added at the end of the list. On routers that already have one
 # queue per subscriber, it must be moved above that subscriber's queue to take effect.
 apply: |

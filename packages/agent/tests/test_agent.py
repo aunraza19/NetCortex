@@ -132,3 +132,15 @@ def test_live_gemma_investigates_heavy_user():
     )
     assert stats.tool_calls, "Gemma should call at least one tool"
     assert report.template_id in {TemplateId.QUEUE_LIMIT, TemplateId.NONE}
+
+
+def test_param_retry_message_spells_out_the_schema():
+    missing = GOOD | {"template_params": {"target": "10.0.0.42"}}
+    model, requests = scripted(missing, GOOD)
+    report, stats = run(model)
+    retry = [p for p in requests[1][-1].parts if isinstance(p, RetryPromptPart)][0]
+    assert "missing param 'upload_mbps'" in str(retry.content)
+    assert "needs exactly these params" in str(retry.content) and "download_mbps" in str(
+        retry.content
+    )
+    assert report.template_id is TemplateId.QUEUE_LIMIT and stats.output_retries == 1

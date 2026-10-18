@@ -161,7 +161,11 @@ def check_fix(ctx: RunContext[Deps], report: IncidentReport) -> IncidentReport:
     try:
         clean = fixes.validate(report.template_id, params)
     except fixes.ParamError as exc:
-        raise ModelRetry(f"template_params are invalid: {exc}") from exc
+        schema = {name: spec.describe() for name, spec in agent_params.items()}
+        raise ModelRetry(
+            f"template_params are invalid: {exc}. {report.template_id.value} needs exactly "
+            f"these params: {schema}"
+        ) from exc
     return report.model_copy(
         update={"template_params": {k: v for k, v in clean.items() if k in agent_params}}
     )
