@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>btecpfb82</task-id>
+<tool-use-id>toolu_01DYBY59tPJ1wGrvoaC1MNmv</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\btecpfb82.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the Temporal worker on demo-hardening" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>befzqj5re</task-id>
+<tool-use-id>toolu_01WnKDL2YDk1rcGJTQwnkvgW</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\befzqj5re.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the FastAPI server on demo-hardening" failed with exit code 127</summary>
+</task-notification>
