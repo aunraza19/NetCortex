@@ -45,7 +45,7 @@ def test_stand_ins_match_the_shared_interfaces():
     ("cause", "evidence"),
     [
         (Cause.HEAVY_USER, "subscriber 10.0.0.42 downloading"),
-        (Cause.UPLINK_DOWN, "100% loss to 1.1.1.1, 8.8.8.8"),
+        (Cause.UPLINK_DOWN, "100% loss to 1.1.1.1, 8.8.8.8 in the last minute"),
         (Cause.DNS_SLOW, "DNS lookups via 192.0.2.53"),
     ],
 )
@@ -79,3 +79,12 @@ def test_injector_rejects_unknown_sites_and_scenarios():
         stub_injector.inject("north-tower", Cause.HEAVY_USER, 5, 1)
     with pytest.raises(ValueError, match="supports"):
         stub_injector.inject("sim-tower", Cause.WIRELESS_INTERFERENCE, 5, 1)
+
+
+def test_an_outage_is_not_mistaken_for_slow_dns_in_its_first_minutes():
+    # Found end to end: 90 s into an outage the 3-minute averages still looked like DNS
+    # trouble, because DNS probes fail along with everything else.
+    for minutes in (1, 2):
+        result = detect("sim-tower", window_for(Cause.UPLINK_DOWN, incident_min=minutes),
+                        MetricsWindow(as_of=AS_OF))  # fmt: skip
+        assert result.cause_guess is Cause.UPLINK_DOWN, (minutes, result.evidence)

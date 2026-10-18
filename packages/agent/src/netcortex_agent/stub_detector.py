@@ -22,6 +22,7 @@ from netcortex_core import (
 
 MODEL = "rules-v0"
 RECENT = timedelta(minutes=3)
+LATEST = timedelta(minutes=1)  # outages show up in the newest minute first
 
 
 def _public(target: str) -> bool:
@@ -83,7 +84,8 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
         return [s for s in made if s is not None]
 
     cause, evidence, forecasts = Cause.NORMAL, [], []
-    loss = {t: _stat(recent_p, "loss_pct", "target", t, "mean") or 0.0 for t in public}
+    latest_p = recent_p[pd.to_datetime(recent_p["time"], utc=True) > as_of - LATEST]
+    loss = {t: _stat(latest_p, "loss_pct", "target", t, "mean") or 0.0 for t in public}
 
     # 1. Uplink down: outside targets unreachable, gateway fine.
     if public and all(value >= 80 for value in loss.values()):
@@ -91,7 +93,7 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
             t for t in private if (_stat(recent_p, "loss_pct", "target", t, "mean") or 0) < 50
         ]
         cause = Cause.UPLINK_DOWN
-        evidence.append(f"{min(loss.values()):.0f}% loss to {', '.join(public)} for 3 min")
+        evidence.append(f"{min(loss.values()):.0f}% loss to {', '.join(public)} in the last minute")
         if gateway_ok:
             rtt = _stat(recent_p, "rtt_ms", "target", gateway_ok[0]) or 0
             evidence.append(f"gateway {gateway_ok[0]} still answers in {rtt:.0f} ms")
@@ -104,7 +106,11 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
             before = _stat(base_p, "rtt_ms", "target", target)
             failing = _stat(recent_p, "loss_pct", "target", target, "mean") or 0
             slow = now is not None and before is not None and now >= max(3 * before, 100)
-            if (slow or failing >= 20) and all(rtt_ratio(t) < 2 for t in public):
+            pings_ok = all(
+                rtt_ratio(t) < 2 and (_stat(recent_p, "loss_pct", "target", t, "mean") or 0) < 10
+                for t in public
+            )
+            if (slow or failing >= 20) and pings_ok:
                 cause = Cause.DNS_SLOW
                 evidence.append(
                     f"DNS lookups via {target.removeprefix('dns:')} take {now or 0:.0f} ms "
