@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M57SW1XTRAKV7DEQK9KGQ8BZ",
+  "strategy": "manual-commit",
+  "branch": "a/collector",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "packages/core/tests/test_core_migrate.py",
+    "packages/core/tests/test_core_settings.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 10514,
+    "cache_read_tokens": 707540,
+    "output_tokens": 5517,
+    "api_call_count": 3
+  }
+}

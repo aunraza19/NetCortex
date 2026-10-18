@@ -1,0 +1,23 @@
+<pasted_content id="5505">
+a/core is merged into main. Pull main and create branch a/collector.
+
+First, a small cleanup commit (GitGuardian false positives):
+- settings.py: chr_password defaults to None (no default value).
+- test_core_migrate.py: use an obviously fake URL on a reserved domain,
+  e.g. host db.example.invalid, password not-a-real-password.
+
+Then do A3 from CLAUDE.md:
+- Site home-lab. ICMP targets: my home router (gateway), the first upstream hop
+  (found by traceroute at startup), 1.1.1.1, 8.8.8.8, and one configurable regional
+  game server. DNS targets (kind=dns): dns:1.1.1.1 and dns:8.8.8.8, with a lookup timeout.
+- Every 10 s: a burst of 5 pings per target; avg RTT, jitter (std), loss %.
+  Write source=live rows via netcortex_core.db.
+- No router yet, so pings and DNS only. Router stats go behind a setting, for when
+  CHR is up.
+- This is Windows. Check that icmplib works without admin; if not, fall back to
+  parsing the system ping command.
+- Must survive errors (log, skip the round, keep going). Start with `uv run collector`.
+- Unit tests without network. Then run it for 2 minutes against the real DB and report
+  row counts only, no secrets.
+Plan briefly, then build. Push and give me the compare URL.
+</pasted_content id="5505">
