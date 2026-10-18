@@ -1,0 +1,7 @@
+<pasted_content id="5505">
+Change the Python pin to 3.12 to match the plan and the partner's packages:
+requires-python ">=3.12,<3.13" at the root and in packages/core; run `uv python install 3.12`
+and `uv python pin 3.12`; then `uv lock`, re-run all tests and ruff, update CLAUDE.md, and push.
+Remove step 2 (the Python 3.14 change) from the partner message.
+Then print the full PR description here in chat so I can paste it into the PR.
+</pasted_content id="5505">
