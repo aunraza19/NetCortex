@@ -1,0 +1,15 @@
+<pasted_content id="5505">
+a/drop-voice is merged. Pull main and branch a/chr. Do A4 + A6 from CLAUDE.md:
+- A4: run MikroTik CHR (free license) on this Windows laptop. Reuse the pinned image
+  and boot steps from the partner's .github/scripts/chr_bootstrap.py
+  (read it from origin/b/workstream-b). Pick the fastest working option here
+  (QEMU for Windows, or WSL2 with KVM if available). Expose the REST API on localhost.
+  Write infra/chr/start (sh or ps1), reset, baseline.rsc, and test_templates.py.
+  The CHR admin password is a local-only value: tell me what to put in .env as
+  CHR_PASSWORD, and never commit it.
+- A6: dry_run() and apply() in packages/fixes via the REST API (SSH fallback).
+  APPLY_TARGET=chr only. Store results in fix_plans.
+- Test all 4 templates on CHR. Remove "untested on CHR" from the ones that pass,
+  and fix the ones that fail.
+Plan briefly, then build. Push and give me the compare URL.
+</pasted_content id="5505">
