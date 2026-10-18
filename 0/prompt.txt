@@ -1,0 +1,46 @@
+the sentry mcp is conencted please see again and then give hte final outp[ut above again.
+
+---
+
+<pasted_content id="5505">
+Read CLAUDE.md. Current state: a/runtime is merged into main (Temporal workflows, API,
+Sentry). The Mac's Ollama IP changed; .env is already updated (don't read it).
+Temporal (PID 19888, :7233), CHR (PID 5416, :9180) and the collector are already running
+in my own terminals; don't start or stop them. Old worker/API processes were killed.
+You start and restart the worker and the API yourself.
+
+Two tasks, in order.
+
+TASK 1: Review the partner's branch origin/b/workstream-b. He merged main into it.
+Do it in a separate worktree (git worktree add ../NetCortex-review origin/b/workstream-b)
+so this folder stays clean. Read-only: don't change files, don't commit, don't touch the
+database, Ollama or CHR. Unit tests only.
+Check:
+1. Root files (pyproject.toml, .gitignore, LICENSE, .gitattributes) match main.
+   Only uv.lock may differ.
+2. No lazy netcortex_core imports; shared types come from netcortex_core, no local copies.
+3. detect() returns a real DetectionResult (score, cause_guess, series, mode).
+   DetectorUnavailable subclasses ModuleUnavailable. detect() writes nothing to the DB.
+4. SecretStr settings are read with .get_secret_value().
+5. No voice code left (speak, ElevenLabs, UI voice player).
+6. His CI starts CHR via infra/chr/chr.py start.
+7. His inject() output matches the shape of our sim-tower stand-in. His modules plug into
+   the agent and worker stubs (the auto-switch works).
+8. uv sync --all-packages, uv run pytest -m "not live", uv run ruff check .
+9. Nothing touches Workstream A folders. No secrets or large files.
+Report: merge now, or an exact numbered fix list I can paste to him.
+
+TASK 2: After the review, branch a/sentry-genai from main and fix both tracing gaps:
+- Wrap the model so every Gemma request opens a gen_ai span inside its activity, with
+  model name, input/output token counts and latency (Sentry AI agent conventions), so
+  Sentry's AI Agents view shows them.
+- Give each Temporal activity its own Sentry scope, so the home-lab monitor's detect
+  span stops landing in incident traces.
+Start the worker and API, run one heavy_user scenario end to end, confirm via the Sentry
+MCP that gen_ai spans with token counts appear and the stray detect span is gone, and give
+me the new trace link. Push and give me the compare URL. Leave the worker and API running.
+</pasted_content id="5505">
+
+---
+
+finish fast
