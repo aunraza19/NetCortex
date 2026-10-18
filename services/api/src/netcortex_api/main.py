@@ -2,6 +2,8 @@
 
     uv run uvicorn netcortex_api.main:app --host 0.0.0.0 --port 8000
 
+The dashboard itself (one HTML page, CSS and plain JS in ui/) is served at /.
+
 With DEMO_MODE=true it serves a saved snapshot of real runs and needs no database,
 Temporal, model or router.
 """
@@ -12,13 +14,15 @@ import time
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 import psycopg
 from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from netcortex_agent import modules
 from netcortex_core import Cause, IncidentStatus, ScenarioLabel, db, get_settings
 from netcortex_core.tracing import init_sentry
@@ -95,6 +99,15 @@ class ScenarioRequest(BaseModel):
     scenario_type: Cause
     duration_min: int = Field(default=5, ge=1, le=60)
     seed: int | None = None
+
+
+UI = Path(__file__).parent / "ui"
+app.mount("/ui", StaticFiles(directory=UI), name="ui")
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(UI / "index.html")
 
 
 @app.get("/health")

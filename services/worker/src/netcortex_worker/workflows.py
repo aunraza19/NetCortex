@@ -107,11 +107,17 @@ class IncidentWorkflow(PydanticAIWorkflow):
     def current_status(self) -> str:
         return self.status.value
 
-    async def _status(self, inp: IncidentInput, status: IncidentStatus, note: str = "") -> None:
+    async def _status(
+        self,
+        inp: IncidentInput,
+        status: IncidentStatus,
+        note: str = "",
+        verdict_at: datetime | None = None,
+    ) -> None:
         self.status = status
         await workflow.execute_activity(
             act.set_status,
-            args=[inp.incident_id, inp.site_id, status, note],
+            args=[inp.incident_id, inp.site_id, status, note, verdict_at],
             start_to_close_timeout=SHORT,
             retry_policy=RETRY,
         )
@@ -212,13 +218,18 @@ class IncidentWorkflow(PydanticAIWorkflow):
         except ActivityError as exc:  # apply() already undid whatever part of it went in
             await self._status(inp, IncidentStatus.ROLLED_BACK, f"apply failed: {exc.cause or exc}")
             return self.status.value
+        watch = timedelta(seconds=inp.timing.verify_wait_s)
+        applied_at = workflow.now()
         await self._status(
-            inp, IncidentStatus.VERIFYING, f"watching for {inp.timing.verify_wait_s:.0f} s"
+            inp,
+            IncidentStatus.VERIFYING,
+            f"watching for {watch.total_seconds():.0f} s",
+            verdict_at=applied_at + watch,
         )
-        await workflow.sleep(timedelta(seconds=inp.timing.verify_wait_s))
+        await workflow.sleep(watch)
         verdict = await workflow.execute_activity(
             act.verify_fix,
-            args=[inp.site_id, inp.deps.detection, report.template_id, inp.opened_at],
+            args=[inp.site_id, inp.deps.detection, report.template_id, inp.opened_at, applied_at],
             start_to_close_timeout=SHORT,
             retry_policy=RETRY,
         )

@@ -210,19 +210,32 @@ async def check_fix(
     return await asyncio.to_thread(_check_fix, incident_id, site_id, template_id, params)
 
 
-def _set_status(incident_id: UUID, site_id: str, status: IncidentStatus, note: str) -> None:
+def _set_status(
+    incident_id: UUID, site_id: str, status: IncidentStatus, note: str, verdict_at: datetime | None
+) -> None:
+    extra = {"verdict_at": verdict_at.isoformat()} if verdict_at else {}
     with db.get_pool().connection() as conn:
         db.set_incident_status(conn, incident_id, status)
         _event(
-            conn, EventKind.INCIDENT_UPDATED, incident_id, site_id, status=status.value, note=note
+            conn,
+            EventKind.INCIDENT_UPDATED,
+            incident_id,
+            site_id,
+            status=status.value,
+            note=note,
+            **extra,
         )
 
 
 @activity.defn
 async def set_status(
-    incident_id: UUID, site_id: str, status: IncidentStatus, note: str = ""
+    incident_id: UUID,
+    site_id: str,
+    status: IncidentStatus,
+    note: str = "",
+    verdict_at: datetime | None = None,  # when verifying: when the verdict is due
 ) -> None:
-    await asyncio.to_thread(_set_status, incident_id, site_id, status, note)
+    await asyncio.to_thread(_set_status, incident_id, site_id, status, note, verdict_at)
 
 
 def _record_decision(fix_plan_id: UUID, decision: str, decided_by: str) -> None:
@@ -278,7 +291,11 @@ def _mean(window, key: str, start: datetime, end: datetime) -> float | None:
 
 
 def _verify(
-    site_id: str, detection: DetectionResult, template_id: TemplateId, opened_at: datetime
+    site_id: str,
+    detection: DetectionResult,
+    template_id: TemplateId,
+    opened_at: datetime,
+    applied_at: datetime | None,
 ) -> VerifyResult:
     spec = fixes.get_template(template_id).verify
     if spec is None:
@@ -287,12 +304,14 @@ def _verify(
     if not keys:
         return VerifyResult(improved=False, detail=f"no {spec.metric} series in the detection")
     now = datetime.now(UTC)
+    # The end of the watch: its last VERIFY_AFTER, or all of it if the watch was shorter.
+    since = now - VERIFY_AFTER if applied_at is None else max(now - VERIFY_AFTER, applied_at)
     with db.get_pool().connection() as conn:
         window = db.fetch_window(conn, site_id, opened_at - VERIFY_BEFORE, now)
     details, improved = [], True
     for key in keys:
         before = _mean(window, key, opened_at - VERIFY_BEFORE, opened_at)
-        after = _mean(window, key, now - VERIFY_AFTER, now)
+        after = _mean(window, key, since, now)
         if before is None or after is None:
             details.append(f"{key}: not enough data")
             improved = False
@@ -312,10 +331,14 @@ def _verify(
 
 @activity.defn
 async def verify_fix(
-    site_id: str, detection: DetectionResult, template_id: TemplateId, opened_at: datetime
+    site_id: str,
+    detection: DetectionResult,
+    template_id: TemplateId,
+    opened_at: datetime,
+    applied_at: datetime | None = None,
 ) -> VerifyResult:
     """Did the key metric improve by the template's verify rule after the fix?"""
-    return await asyncio.to_thread(_verify, site_id, detection, template_id, opened_at)
+    return await asyncio.to_thread(_verify, site_id, detection, template_id, opened_at, applied_at)
 
 
 ALL = [

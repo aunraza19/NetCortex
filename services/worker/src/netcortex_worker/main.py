@@ -91,7 +91,9 @@ async def start_monitors(client: Client, sites: list[str], timing: Timing, queue
             MonitorInput(site_id=site_id, timing=timing),
             id=f"monitor-{site_id}",
             task_queue=queue,
-            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            # Restart a running monitor so it picks up the current timing settings (it is a
+            # stateless loop; incident workflows it started keep running).
+            id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
         )
         log.info("monitoring %s", site_id)
 
