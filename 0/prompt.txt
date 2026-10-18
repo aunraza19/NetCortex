@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>b167z0s8l</task-id>
+<tool-use-id>toolu_011hURzfaTyXdygyEhSLD2U9</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\b167z0s8l.output</output-file>
+<status>completed</status>
+<summary>Background command "Run thinking on/off comparison in background" completed (exit code 0)</summary>
+</task-notification>
