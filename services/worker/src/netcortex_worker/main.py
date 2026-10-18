@@ -1,14 +1,15 @@
 """`uv run worker`: the Temporal worker, plus one MonitorSiteWorkflow per MONITOR_SITES site.
 
-Sentry: every activity runs in a transaction. Activities of incident workflows share one
-trace whose ID is the incident ID, so a whole incident (model calls, tool calls, dry run,
-apply, verify) shows up as a single trace.
+Sentry: every activity runs in a transaction, in a scope of its own. Activities of incident
+workflows share one trace whose ID is the incident ID, so a whole incident (model calls,
+tool calls, dry run, apply, verify) shows up as a single trace.
 """
 
 import argparse
 import asyncio
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any
 from uuid import UUID
@@ -51,18 +52,30 @@ def trace_id_for(workflow_id: str) -> str | None:
         return None
 
 
+async def run_traced(
+    workflow_id: str, activity_type: str, call: Callable[[], Awaitable[Any]]
+) -> Any:
+    """Run one activity in a Sentry transaction with a scope of its own.
+
+    Activities run concurrently on one event loop. Sharing a scope, a span from one activity
+    (say the home-lab monitor's detect) would land in whichever transaction started last.
+    """
+    trace_id = trace_id_for(workflow_id)
+    headers = {"sentry-trace": f"{trace_id}-{secrets.token_hex(8)}-1"} if trace_id else {}
+    with sentry_sdk.isolation_scope():
+        transaction = sentry_sdk.continue_trace(headers, op="temporal.activity", name=activity_type)
+        with sentry_sdk.start_transaction(transaction):
+            sentry_sdk.set_tag("workflow_id", workflow_id)
+            sentry_sdk.set_tag("activity", activity_type)
+            return await call()
+
+
 class _SentryActivities(ActivityInboundInterceptor):
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         info = activity.info()
-        trace_id = trace_id_for(info.workflow_id)
-        headers = {"sentry-trace": f"{trace_id}-{secrets.token_hex(8)}-1"} if trace_id else {}
-        transaction = sentry_sdk.continue_trace(
-            headers, op="temporal.activity", name=info.activity_type
+        return await run_traced(
+            info.workflow_id, info.activity_type, lambda: self.next.execute_activity(input)
         )
-        with sentry_sdk.start_transaction(transaction):
-            sentry_sdk.set_tag("workflow_id", info.workflow_id)
-            sentry_sdk.set_tag("activity", info.activity_type)
-            return await self.next.execute_activity(input)
 
 
 class SentryInterceptor(Interceptor):
