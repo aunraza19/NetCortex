@@ -1,0 +1,16 @@
+# Hosted demo blueprint. The Next.js UI runs as a Node web service.
+# Add an API service only after Aun's backend and deployment contract are available.
+services:
+  - type: web
+    name: netcortex-demo
+    runtime: node
+    rootDir: apps/web
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_MODE
+        value: mock
+    # Set API URLs and rebuild only after Aun's service contract is confirmed.

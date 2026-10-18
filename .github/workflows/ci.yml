@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "b/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+      - name: Install every workspace package
+        run: uv sync --all-packages --locked
+      - name: Ruff
+        run: uv run --locked ruff check .
+      - name: Pytest
+        run: uv run --locked pytest --cov --cov-report=term-missing
+
+  web:
+    name: Web lint, typecheck, build, and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run web checks when the app exists
+        shell: bash
+        run: |
+          if [[ ! -f apps/web/package.json ]]; then
+            echo "Web app not present yet; web checks are pending."
+            exit 0
+          fi
+          if [[ ! -f apps/web/package-lock.json ]]; then
+            echo "apps/web/package-lock.json is required for reproducible CI." >&2
+            exit 1
+          fi
+          cd apps/web
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build
+          if [[ -f playwright.config.ts || -f playwright.config.js || -f playwright.config.mts ]]; then
+            npx playwright install --with-deps chromium
+            npx playwright test
+          else
+            echo "Playwright configuration not present yet; browser checks are pending."
+          fi
+
+  chr-templates:
+    name: CHR router template integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Run Aun's real CHR harness when available
+        shell: bash
+        run: |
+          if [[ ! -f infra/chr/test_templates.py ]]; then
+            echo "PENDING: infra/chr/test_templates.py is not present. No router tests were run."
+            exit 0
+          fi
+          uv sync --all-packages --locked
+          uv run --locked python infra/chr/test_templates.py
