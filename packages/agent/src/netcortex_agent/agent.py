@@ -81,6 +81,7 @@ class Deps(BaseModel):
     detection: DetectionResult
     window: facts.WindowData
     site: Site | None = None
+    tabpfn: DetectionResult | None = None  # second opinion, when the partner's detector ran
     _metrics: MetricsWindow | None = PrivateAttr(default=None)
 
     def metrics(self) -> MetricsWindow:
@@ -130,6 +131,9 @@ def get_metrics(ctx: RunContext[Deps], series: str, minutes: int = 15) -> dict[s
 @incident_agent.tool
 def get_forecast(ctx: RunContext[Deps], series: str) -> dict[str, Any]:
     """The detector's p10/p50/p90 forecast for one series, 1-5 minutes ahead."""
+    tabpfn = ctx.deps.tabpfn
+    if tabpfn and any(f.series_key == series for f in tabpfn.series):
+        return facts.forecast_summary(tabpfn, series) | {"model": tabpfn.model}
     return facts.forecast_summary(ctx.deps.detection, series)
 
 
