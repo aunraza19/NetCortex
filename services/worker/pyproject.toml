@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netcortex-worker"
+version = "0.1.0"
+description = "Temporal worker: MonitorSiteWorkflow and IncidentWorkflow"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "netcortex-core",
+    "netcortex-agent",
+    "netcortex-fixes",
+    "pydantic-ai-slim[openai,temporal]>=1.0,<2",
+    "temporalio>=1.18,<2",
+    "sentry-sdk>=2.40,<3",
+]
+
+[project.scripts]
+worker = "netcortex_worker.main:main"
+
+[tool.uv.sources]
+netcortex-core = { workspace = true }
+netcortex-agent = { workspace = true }
+netcortex-fixes = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netcortex_worker"]
