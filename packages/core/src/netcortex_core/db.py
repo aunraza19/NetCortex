@@ -7,10 +7,12 @@ Helpers take an open connection so the caller decides the transaction:
 """
 
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
 
+import pandas as pd
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
@@ -26,8 +28,11 @@ from netcortex_core.schemas import (
     FixPlan,
     IfaceMetric,
     Incident,
+    IncidentReport,
     IncidentStatus,
+    MetricsWindow,
     ProbeMetric,
+    ScenarioLabel,
     Site,
     SubscriberMetric,
 )
@@ -184,3 +189,76 @@ def fetch_site(conn: Connection, site_id: str) -> Site | None:
 def insert_fix_plan(conn: Connection, plan: FixPlan) -> UUID:
     _insert_many(conn, "fix_plans", tuple(FixPlan.model_fields), [plan])
     return plan.id
+
+
+def insert_scenario_label(conn: Connection, label: ScenarioLabel) -> UUID:
+    _insert_many(conn, "scenario_labels", tuple(ScenarioLabel.model_fields), [label])
+    return label.id
+
+
+def fetch_window(conn: Connection, site_id: str, start: datetime, as_of: datetime) -> MetricsWindow:
+    """Metrics for one site with start < time <= as_of (rows dated in the future are left out)."""
+    frames = {}
+    for table, columns in (
+        ("probe_metrics", PROBE_COLUMNS),
+        ("iface_metrics", IFACE_COLUMNS),
+        ("subscriber_metrics", SUBSCRIBER_COLUMNS),
+    ):
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT {', '.join(columns)} FROM {table} "
+                "WHERE site_id = %s AND time > %s AND time <= %s ORDER BY time",
+                (site_id, start, as_of),
+            )
+            frames[table] = pd.DataFrame(cur.fetchall(), columns=list(columns))
+    return MetricsWindow(
+        as_of=as_of,
+        probe_metrics=frames["probe_metrics"],
+        iface_metrics=frames["iface_metrics"],
+        subscriber_metrics=frames["subscriber_metrics"],
+    )
+
+
+def has_open_incident(conn: Connection, site_id: str, cause: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM incidents WHERE site_id = %s AND cause = %s AND closed_at IS NULL",
+            (site_id, cause),
+        )
+        return cur.fetchone() is not None
+
+
+def fetch_incident(conn: Connection, incident_id: UUID) -> Incident | None:
+    columns = tuple(Incident.model_fields)
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT {', '.join(columns)} FROM incidents WHERE id = %s", (incident_id,))
+        row = cur.fetchone()
+    return None if row is None else Incident.model_validate(dict(zip(columns, row, strict=True)))
+
+
+def save_report(conn: Connection, incident_id: UUID, report: IncidentReport) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE incidents SET report = %s, cause = %s, confidence = %s WHERE id = %s",
+            (_value(report), report.likely_cause.value, report.confidence, incident_id),
+        )
+
+
+def latest_fix_plan(conn: Connection, incident_id: UUID) -> FixPlan | None:
+    columns = tuple(FixPlan.model_fields)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT {', '.join(columns)} FROM fix_plans WHERE incident_id = %s "
+            "ORDER BY created_at DESC LIMIT 1",
+            (incident_id,),
+        )
+        row = cur.fetchone()
+    return None if row is None else FixPlan.model_validate(dict(zip(columns, row, strict=True)))
+
+
+def set_fix_decision(conn: Connection, fix_plan_id: UUID, decision: str, decided_by: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE fix_plans SET decision = %s, decided_by = %s, decided_at = now() WHERE id = %s",
+            (decision, decided_by, fix_plan_id),
+        )
