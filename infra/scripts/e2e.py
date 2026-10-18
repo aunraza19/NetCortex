@@ -33,7 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", choices=["heavy_user", "uplink_down", "dns_slow"])
     parser.add_argument("--api", default="http://127.0.0.1:8000")
-    parser.add_argument("--duration", type=int, default=2)
+    parser.add_argument("--duration", type=int, default=3)
     parser.add_argument("--reject", action="store_true")
     parser.add_argument("--incident", help="follow this existing incident instead of injecting")
     args = parser.parse_args()
