@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>b2pnwwg7i</task-id>
+<tool-use-id>toolu_017faiEiDkS1S5RS6UgKLuP8</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\b2pnwwg7i.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the Temporal worker on new code" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzpki8xqd</task-id>
+<tool-use-id>toolu_01MpskxVLgU1SpzK9Qc61Pf7</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bzpki8xqd.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the FastAPI server on new code" failed with exit code 127</summary>
+</task-notification>
