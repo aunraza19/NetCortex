@@ -34,6 +34,9 @@ from temporalio import activity
 WINDOW = timedelta(minutes=30)
 HISTORY = timedelta(hours=2)  # baseline for the detector; more is slow at 10 s resolution
 STALE_AFTER = timedelta(minutes=2)
+# After an incident closes, the same cause on the same site waits this long before a new one
+# opens, so the tail of the same anomaly doesn't open a duplicate.
+COOLDOWN = timedelta(minutes=4)  # longer than the detector's 3-minute window
 VERIFY_BEFORE = timedelta(minutes=3)  # metric before the incident opened ...
 VERIFY_AFTER = timedelta(minutes=2)  # ... against the last minutes of the watch period
 
@@ -87,7 +90,7 @@ def _monitor(site_id: str) -> MonitorResult:
         db.upsert_forecasts(conn, site_id, detection)
         if not detection.is_anomaly:
             return MonitorResult(site_id=site_id, status="normal")
-        if db.has_open_incident(conn, site_id, detection.cause_guess.value):
+        if db.has_open_incident(conn, site_id, detection.cause_guess.value, now - COOLDOWN):
             return MonitorResult(site_id=site_id, status="already_open")
         incident = Incident(
             site_id=site_id,

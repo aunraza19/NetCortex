@@ -57,7 +57,8 @@ def main() -> int:
 
     def new_incident():
         found = [i for i in api.get("/incidents").json() if i["id"] not in known]
-        return found[0] if found else None
+        matching = [i for i in found if i["cause"] == args.scenario]
+        return (matching or found or [None])[0]
 
     incident = wait_for(new_incident, bool, timeout_s=300)
     incident_id = incident["id"]

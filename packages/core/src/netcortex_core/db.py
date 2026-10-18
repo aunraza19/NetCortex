@@ -7,7 +7,7 @@ Helpers take an open connection so the caller decides the transaction:
 """
 
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
@@ -219,11 +219,15 @@ def fetch_window(conn: Connection, site_id: str, start: datetime, as_of: datetim
     )
 
 
-def has_open_incident(conn: Connection, site_id: str, cause: str) -> bool:
+def has_open_incident(
+    conn: Connection, site_id: str, cause: str, closed_since: datetime | None = None
+) -> bool:
+    """An incident for this site and cause is open (or, with `closed_since`, closed after it)."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT 1 FROM incidents WHERE site_id = %s AND cause = %s AND closed_at IS NULL",
-            (site_id, cause),
+            "SELECT 1 FROM incidents WHERE site_id = %s AND cause = %s "
+            "AND (closed_at IS NULL OR closed_at > %s)",
+            (site_id, cause, closed_since or datetime.max.replace(tzinfo=UTC)),
         )
         return cur.fetchone() is not None
 
