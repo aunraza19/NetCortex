@@ -16,10 +16,14 @@ Provisioning handles the first-login license flow by answering `n` to the option
 
 ## External router test gate
 
-The bootstrap, router lifecycle, QEMU command, credential handling, license/password prompts, CLI error handling, and response-shape checks are B-owned and tested offline with fake console/process/network responses. `infra/chr/test_templates.py` is Aun-owned. When it is absent, a separate smoke job boots CHR and verifies authenticated REST readiness, while the real template job remains skipped with a pending summary. Unit tests and boot smoke do not count as template/router integration tests.
+The bootstrap, router lifecycle, QEMU command, credential handling, license/password prompts, CLI error handling, and response-shape checks are B-owned and tested offline with fake console/process/network responses. `infra/chr/test_templates.py` is Aun-owned. When it is absent, a separate smoke job boots CHR and verifies authenticated REST readiness, while the real template job remains skipped with a pending summary. Unit tests and boot smoke do not count as template apply/read-back/rollback tests.
 
 The workflow retains `/tmp/netcortex-chr/qemu.log` as an artifact and cleanup validates both the recorded PID and its QEMU command line before signaling it. The disk and log remain in the runner temp directory until the job is discarded; no downloaded router image is committed.
 
 ## Copilot review
 
 Repository instructions can shape Copilot's review, but automatic review still requires repository/organization admin configuration and a qualifying Copilot plan. See [admin-setup.md](admin-setup.md). The repository does not claim Copilot review is enabled until an owner verifies the setting in GitHub.
+
+## Verified implementation run
+
+The corrected [CHR smoke](https://github.com/aunraza19/NetCortex/actions/runs/39131915789) passed on `d60ffac`, including authenticated REST readiness and cleanup. The template job was skipped because Aun's harness is absent. [Python/frontend CI](https://github.com/aunraza19/NetCortex/actions/runs/39131915864) also passed.

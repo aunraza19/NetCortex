@@ -18,7 +18,7 @@ Only free tiers/credits; no purchase. Do not ask again for Git identity/auth.
 ## Actual local checks
 
 - Locked base workspace sync passed; optional heavy model extras excluded.
-- Root Ruff passed; combined Python/bootstrap suite: 84 passed in 11.75s,
+- Root Ruff passed; combined Python/bootstrap suite: 87 passed in 7.30s,
   branch coverage 68%. Current NumPy/pandas emit deprecation warnings.
 - Four wheels/source distributions built; installed simgen/detector CLI help passed.
 - Frontend format/lint/typecheck/production build passed.
@@ -34,7 +34,11 @@ Only free tiers/credits; no purchase. Do not ask again for Git identity/auth.
   recall 62/70; median ~.097s; zero false alerts over .20833 normal site-days.
   Single snapshots do not measure detection delay or continuous operation.
 - Cloud-unavailable report: 0/80 model cases scored; never counts absence as normal.
-- CHR offline: 12 tests, no local Linux boot. Real smoke must be observed on Actions.
+- CHR offline: 15 tests. Corrected real Linux CHR boot, authenticated REST and
+  cleanup passed: https://github.com/aunraza19/NetCortex/actions/runs/39131915789
+- Corrected Linux Python/frontend CI passed: https://github.com/aunraza19/NetCortex/actions/runs/39131915864
+  Both push and PR runs passed on d60ffac; template apply/read-back/rollback
+  remains skipped because Aun harness is absent.
 
 ## GitHub and external gates
 
@@ -51,12 +55,12 @@ harness. Public shared-type wrappers deliberately fail until those contracts exi
 DB/model/provider/Render/domain access is missing. Tiger/TabPFN MCP configured,
 not authenticated/verified. RouterOS and Sentry skills installed/read/applied.
 
-## Delivery follow-through
+## Delivery
 
 Branch pushed; draft PR https://github.com/aunraza19/NetCortex/pull/1 is open.
-First push CI passed; PR CI exposed a transient rollback assertion. Real CHR
-boot reached login but password confirmation failed, with CRLF double-submit
-visible in the preserved console. Workers are correcting deterministic browser
-clocks and serial CR-only input before rerunning. Observe corrected CI/CHR. Add run/PR links to validation docs and final handoff.
-Copilot automatic review requires Aun admin/eligible plan; do not claim enabled.
-No merge or deployment is authorized/possible without shared code/account access.
+The first runs exposed a transient browser assertion and serial CRLF double
+submission. Both fixes were verified by successful push and PR CI runs.
+Documentation links those implementation-run results. Shared runtime/provider
+and deployment gates remain explicit; the PR stays draft for Aun's contract review.
+Copilot automatic review requires Aun admin/eligible plan; it is not enabled.
+No merge, purchase or live deployment has been performed.

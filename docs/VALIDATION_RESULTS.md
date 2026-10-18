@@ -6,7 +6,7 @@ checks from the shared runtime and external services that are still pending.
 | Check | Actual result |
 | --- | --- |
 | Locked base Python workspace | Four packages installed successfully with Python 3.12; optional heavy model extras excluded |
-| Python lint and tests | Ruff passed; 84 tests passed in 11.75 seconds; combined branch coverage 68% (live services excluded) |
+| Python lint and tests | Ruff passed; 87 tests passed in 7.30 seconds; combined branch coverage 68% (live services excluded) |
 | Distribution build | All four source distributions and wheels built successfully |
 | CLI startup | Installed `simgen --help` and `netcortex-detector --help` passed |
 | Frontend | Prettier, ESLint, TypeScript and production Next.js build passed |
@@ -15,8 +15,9 @@ checks from the shared runtime and external services that are still pending.
 | Dependency audit | Production dependencies: zero findings. Five high development entries share unpatched braces advisory GHSA-vfj7-8cjw-p6xm; see web decisions |
 | RIPE download | 11,819 real public ping records, three PK probes / three ASNs, October 11–17; three daily request gaps recorded |
 | Calibration | Actual per-target/hour and explicitly opted-in public DNS role-proxy statistics; no DNS lookup timing claim |
-| CHR offline lifecycle | 12 fake-console/network/process tests passed; these do not count as a real boot |
-| GitHub Actions | Results and links added after push |
+| CHR offline lifecycle | 15 fake-console/network/process tests passed; these do not count as a real boot |
+| GitHub Actions | [Python/frontend CI](https://github.com/aunraza19/NetCortex/actions/runs/39131915864) passed on implementation commit `d60ffac`; all 87 Python and 17 browser tests passed |
+| Real isolated CHR | [Router smoke](https://github.com/aunraza19/NetCortex/actions/runs/39131915789) passed: pinned RouterOS boot, console provisioning, two authenticated REST resource checks and cleanup. Template job skipped pending Aun harness |
 
 The detector regressions cover past-only features, finite physical bounds, SDK
 quantile layout, all five horizons, capped fit contexts, stale/future and mixed
@@ -25,6 +26,11 @@ nonfinite model outputs, separate split windows and safe observation paths.
 Provider tests cover malformed responses, timeouts, unavailable audio/news and
 embedding identity/dimension checks. UI tests cover confirmation, failed router
 checks, duplicate submissions, missing incidents, site backup topology and rollback.
+
+The first real runs exposed serial CRLF double submission and a transient browser
+assertion. Both were corrected before the successful runs linked above. The
+report update changes documentation only. [Draft PR #1](https://github.com/aunraza19/NetCortex/pull/1)
+contains the implementation and the remaining shared-runtime gates.
 
 ## Evaluation
 

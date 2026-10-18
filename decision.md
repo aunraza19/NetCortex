@@ -38,7 +38,10 @@ The first Linux CI run passed. The parallel PR run exposed a browser assertion
 against a short-lived fixture state, so tests now control the clock explicitly.
 The first real CHR boot reached RouterOS login and exposed CRLF being treated as
 two Enter keys during password confirmation. The serial helper now submits CR
-and retains redacted diagnostics. Fake-console tests alone did not reveal this.
+and retains redacted diagnostics. Fake-console tests alone did not reveal this. The corrected
+[Python/frontend CI](https://github.com/aunraza19/NetCortex/actions/runs/39131915864) and
+[real CHR smoke](https://github.com/aunraza19/NetCortex/actions/runs/39131915789) both passed
+on implementation commit `d60ffac`.
 
 ## Current external gates
 
