@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "netcortex-core"
 version = "0.1.0"
 description = "Shared schemas, settings, module interfaces and database access for NetCortex"
-requires-python = ">=3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.12,<3",
     "pydantic-settings>=2.9,<3",

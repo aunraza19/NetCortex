@@ -2,7 +2,7 @@
 name = "netcortex-workspace"
 version = "0.1.0"
 description = "NetCortex development workspace"
-requires-python = ">=3.14,<3.15"
+requires-python = ">=3.12,<3.13"
 # Workspace packages installed by a plain `uv sync`. Add each new member here.
 dependencies = ["netcortex-core"]
 
@@ -25,7 +25,7 @@ netcortex-core = { workspace = true }
 
 [tool.ruff]
 line-length = 100
-target-version = "py314"
+target-version = "py312"
 src = ["packages"]
 
 [tool.ruff.lint]

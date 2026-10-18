@@ -3,6 +3,8 @@
 Times are timezone-aware UTC everywhere. The UI converts to Pakistan time.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal

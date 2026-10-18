@@ -55,7 +55,7 @@ If a partner module is not merged yet, put a stub with the **same interface** in
 
 ### A0. Setup (15 min)
 
-- `uv` workspace at the repo root, Python 3.14 (pinned in `.python-version`; root `pyproject.toml` requires `>=3.14,<3.15`).
+- `uv` workspace at the repo root, Python 3.12 (pinned in `.python-version`; root `pyproject.toml` requires `>=3.12,<3.13`, matching the partner's packages).
 - `ruff` and `pytest` configured.
 - `.gitignore`: `.env`, `data/raw`, `data/generated`, `var/`, `.venv`, `node_modules`.
 - MIT `LICENSE` if missing.
