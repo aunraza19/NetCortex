@@ -195,3 +195,22 @@ def build_prompt(
         "Investigate, then return the incident report.",
     ]
     return "\n".join(lines)
+
+
+def second_opinion_prompt(tabpfn: DetectionResult) -> str:
+    """Extra evidence from TabPFN, added to the prompt. Rules opened the incident."""
+    forecasts = ", ".join(f.series_key for f in tabpfn.series) or "none"
+    return (
+        f"Second opinion from the TabPFN detector ({tabpfn.model}): cause guess "
+        f"{tabpfn.cause_guess.value} (confidence {tabpfn.cause_confidence:.2f}), anomaly score "
+        f"{tabpfn.score:.2f}. get_forecast returns its p10/p50/p90 bands for: {forecasts}. "
+        "Weigh it against the metrics; it can be wrong."
+    )
+
+
+def second_opinion_evidence(tabpfn: DetectionResult) -> str:
+    """One line for the stored report's evidence."""
+    return (
+        f"TabPFN second opinion: {tabpfn.cause_guess.value} "
+        f"(confidence {tabpfn.cause_confidence:.2f}, anomaly score {tabpfn.score:.2f})"
+    )
