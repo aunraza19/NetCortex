@@ -1,0 +1,22 @@
+messages:
+  uplink_congestion:
+    en: "Your internet may feel slow while the main link is busy. We are checking the connection."
+    ur: "مین لنک پر زیادہ رش ہے، اس لیے انٹرنیٹ سست ہو سکتا ہے۔ ہم کنکشن چیک کر رہے ہیں۔"
+  heavy_user:
+    en: "Network traffic is uneven. We are checking the affected connection."
+    ur: "نیٹ ورک ٹریفک غیر متوازن ہے۔ ہم متاثرہ کنکشن چیک کر رہے ہیں۔"
+  upstream_degradation:
+    en: "The upstream provider may be having trouble. Your local network is responding."
+    ur: "اوپر والے انٹرنیٹ فراہم کنندہ کے نیٹ ورک میں مسئلہ ہو سکتا ہے۔ مقامی نیٹ ورک جواب دے رہا ہے۔"
+  game_route_issue:
+    en: "The route to one game service is unstable. Other connections may work normally."
+    ur: "ایک گیم سروس کا راستہ غیر مستحکم ہے۔ باقی کنکشن معمول کے مطابق چل سکتے ہیں۔"
+  wireless_interference:
+    en: "A wireless link is unstable. A technician may need to inspect it."
+    ur: "ایک وائرلیس لنک غیر مستحکم ہے۔ ٹیکنیشن کو اسے دیکھنے کی ضرورت ہو سکتی ہے۔"
+  uplink_down:
+    en: "The main internet link is unavailable. Backup routing may be in use."
+    ur: "مین انٹرنیٹ لنک دستیاب نہیں۔ بیک اپ راستہ استعمال ہو سکتا ہے۔"
+  dns_slow:
+    en: "Name lookups are delayed. Other parts of the connection may be working."
+    ur: "ویب نام تلاش کرنے میں تاخیر ہے۔ کنکشن کے دوسرے حصے کام کر رہے ہو سکتے ہیں۔"

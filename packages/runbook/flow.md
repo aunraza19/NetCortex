@@ -1,0 +1,7 @@
+# Flow
+
+`python -m netcortex_runbook.cli fixture QUERY --mock` prints explicit offline fixture excerpts. `runbook search QUERY` uses the actual core `Settings`, embeds through Ollama, queries `runbook_chunks`, and serializes core `RunbookChunk` records. `runbook ingest` reads the same settings, fetches the approved official MikroTik pages, embeds chunks, and upserts them. Both live operations require the configured database and Ollama service.
+
+`search_runbook(query, k=5)` validates query and result count, sends `Settings.embed_model` unchanged, verifies 768 finite dimensions, then orders rows by pgvector cosine distance. Results carry `score=1-distance`; an empty list means no matches. The configured model is exactly `embeddinggemma` by default. Ollama's equivalent `embeddinggemma:latest` response alias is accepted only when the request used the bare default; unrelated tags fail.
+
+The shared `Settings`, `RunbookChunk`, and `ModuleUnavailable` contracts are direct imports from `netcortex_core`. `database_url` remains a `SecretStr` until psycopg receives it. A missing URL or live search provider/database/model failure raises `ModuleUnavailable`; the exception message includes only the failure class, not a potentially credential-bearing provider message. Invalid query or `k` raises `ValueError`. Fixture search performs no network or database calls and marks each result as a fixture.

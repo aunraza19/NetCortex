@@ -1,0 +1,728 @@
+{
+  "provenance": [
+    "ripe"
+  ],
+  "experimental_status": "Hourly and target statistics are medians of observed samples only. Target/hour RTTs apply only when configured target names match. Role proxies require an explicit map and opt-in flag and are restricted to configured public DNS reachability targets. Ping reachability is not DNS resolution timing.",
+  "target_medians_ms": {
+    "192.5.5.241": 16.85852,
+    "193.0.14.129": 7.894053666666667
+  },
+  "target_stats": {
+    "192.5.5.241": {
+      "sample_count": 4028,
+      "rtt_ms": 16.85852,
+      "jitter_ms": 0.08237573216397984,
+      "loss_pct": 0.0
+    },
+    "193.0.14.129": {
+      "sample_count": 7099,
+      "rtt_ms": 7.894053666666667,
+      "jitter_ms": 0.04502710909613845,
+      "loss_pct": 0.0
+    }
+  },
+  "target_hourly_ms": {
+    "192.5.5.241": {
+      "0": 16.551208,
+      "1": 16.460082166666666,
+      "2": 16.480653666666665,
+      "3": 16.43144266666667,
+      "4": 16.493018666666668,
+      "5": 16.470335,
+      "6": 16.482232999999997,
+      "7": 17.67344866666667,
+      "8": 17.660875333333333,
+      "9": 17.677235833333334,
+      "10": 17.683419833333332,
+      "11": 17.691219666666665,
+      "12": 17.748065999999998,
+      "13": 16.711672166666666,
+      "14": 18.12307666666667,
+      "15": 17.903861333333335,
+      "16": 16.787747833333334,
+      "17": 16.811923333333333,
+      "18": 16.883398,
+      "19": 16.7215055,
+      "20": 16.749110333333334,
+      "21": 16.776593833333333,
+      "22": 16.601736166666665,
+      "23": 16.608373666666665
+    },
+    "193.0.14.129": {
+      "0": 7.766230999999999,
+      "1": 7.779592999999999,
+      "2": 7.78787,
+      "3": 7.889932,
+      "4": 7.520911833333334,
+      "5": 7.43387,
+      "6": 7.5493239999999995,
+      "7": 7.610784333333332,
+      "8": 7.555726333333332,
+      "9": 7.811861166666667,
+      "10": 7.942510666666666,
+      "11": 8.058916166666666,
+      "12": 8.269731333333334,
+      "13": 8.324717333333332,
+      "14": 8.001093333333333,
+      "15": 8.1707405,
+      "16": 8.079793666666667,
+      "17": 8.284253666666666,
+      "18": 8.331689666666668,
+      "19": 8.114797666666666,
+      "20": 7.927429,
+      "21": 7.9019363333333335,
+      "22": 7.943615,
+      "23": 7.857167666666666
+    }
+  },
+  "target_hourly_stats": {
+    "192.5.5.241": {
+      "0": {
+        "sample_count": 171,
+        "rtt_ms": 16.551208,
+        "jitter_ms": 0.08723196902894369,
+        "loss_pct": 0.0
+      },
+      "1": {
+        "sample_count": 164,
+        "rtt_ms": 16.460082166666666,
+        "jitter_ms": 0.06263128287844744,
+        "loss_pct": 0.0
+      },
+      "2": {
+        "sample_count": 169,
+        "rtt_ms": 16.480653666666665,
+        "jitter_ms": 0.06513735497819637,
+        "loss_pct": 0.0
+      },
+      "3": {
+        "sample_count": 164,
+        "rtt_ms": 16.43144266666667,
+        "jitter_ms": 0.06734879409334318,
+        "loss_pct": 0.0
+      },
+      "4": {
+        "sample_count": 170,
+        "rtt_ms": 16.493018666666668,
+        "jitter_ms": 0.06160606919488268,
+        "loss_pct": 0.0
+      },
+      "5": {
+        "sample_count": 170,
+        "rtt_ms": 16.470335,
+        "jitter_ms": 0.062486896789335916,
+        "loss_pct": 0.0
+      },
+      "6": {
+        "sample_count": 167,
+        "rtt_ms": 16.482232999999997,
+        "jitter_ms": 0.0609383460738985,
+        "loss_pct": 0.0
+      },
+      "7": {
+        "sample_count": 169,
+        "rtt_ms": 17.67344866666667,
+        "jitter_ms": 0.07209053793359879,
+        "loss_pct": 0.0
+      },
+      "8": {
+        "sample_count": 167,
+        "rtt_ms": 17.660875333333333,
+        "jitter_ms": 0.07230787847500103,
+        "loss_pct": 0.0
+      },
+      "9": {
+        "sample_count": 168,
+        "rtt_ms": 17.677235833333334,
+        "jitter_ms": 0.08598795710954867,
+        "loss_pct": 0.0
+      },
+      "10": {
+        "sample_count": 164,
+        "rtt_ms": 17.683419833333332,
+        "jitter_ms": 0.0764706252819589,
+        "loss_pct": 0.0
+      },
+      "11": {
+        "sample_count": 169,
+        "rtt_ms": 17.691219666666665,
+        "jitter_ms": 0.08759109905438797,
+        "loss_pct": 0.0
+      },
+      "12": {
+        "sample_count": 171,
+        "rtt_ms": 17.748065999999998,
+        "jitter_ms": 0.08607756587455918,
+        "loss_pct": 0.0
+      },
+      "13": {
+        "sample_count": 170,
+        "rtt_ms": 16.711672166666666,
+        "jitter_ms": 0.10387277837942613,
+        "loss_pct": 0.0
+      },
+      "14": {
+        "sample_count": 168,
+        "rtt_ms": 18.12307666666667,
+        "jitter_ms": 0.11632398105445785,
+        "loss_pct": 0.0
+      },
+      "15": {
+        "sample_count": 167,
+        "rtt_ms": 17.903861333333335,
+        "jitter_ms": 0.10073576050572414,
+        "loss_pct": 0.0
+      },
+      "16": {
+        "sample_count": 166,
+        "rtt_ms": 16.787747833333334,
+        "jitter_ms": 0.08513931209142364,
+        "loss_pct": 0.0
+      },
+      "17": {
+        "sample_count": 170,
+        "rtt_ms": 16.811923333333333,
+        "jitter_ms": 0.09845366630407364,
+        "loss_pct": 0.0
+      },
+      "18": {
+        "sample_count": 167,
+        "rtt_ms": 16.883398,
+        "jitter_ms": 0.10846517943356529,
+        "loss_pct": 0.0
+      },
+      "19": {
+        "sample_count": 166,
+        "rtt_ms": 16.7215055,
+        "jitter_ms": 0.08740146543418953,
+        "loss_pct": 0.0
+      },
+      "20": {
+        "sample_count": 165,
+        "rtt_ms": 16.749110333333334,
+        "jitter_ms": 0.12022342645535682,
+        "loss_pct": 0.0
+      },
+      "21": {
+        "sample_count": 168,
+        "rtt_ms": 16.776593833333333,
+        "jitter_ms": 0.11234178991210653,
+        "loss_pct": 0.0
+      },
+      "22": {
+        "sample_count": 170,
+        "rtt_ms": 16.601736166666665,
+        "jitter_ms": 0.09395578484504383,
+        "loss_pct": 0.0
+      },
+      "23": {
+        "sample_count": 168,
+        "rtt_ms": 16.608373666666665,
+        "jitter_ms": 0.07806283871480835,
+        "loss_pct": 0.0
+      }
+    },
+    "193.0.14.129": {
+      "0": {
+        "sample_count": 298,
+        "rtt_ms": 7.766230999999999,
+        "jitter_ms": 0.04321145040112888,
+        "loss_pct": 0.0
+      },
+      "1": {
+        "sample_count": 295,
+        "rtt_ms": 7.779592999999999,
+        "jitter_ms": 0.04182783331971933,
+        "loss_pct": 0.0
+      },
+      "2": {
+        "sample_count": 294,
+        "rtt_ms": 7.78787,
+        "jitter_ms": 0.040253578554628994,
+        "loss_pct": 0.0
+      },
+      "3": {
+        "sample_count": 290,
+        "rtt_ms": 7.889932,
+        "jitter_ms": 0.04551134974164825,
+        "loss_pct": 0.0
+      },
+      "4": {
+        "sample_count": 296,
+        "rtt_ms": 7.520911833333334,
+        "jitter_ms": 0.046292455069333834,
+        "loss_pct": 0.0
+      },
+      "5": {
+        "sample_count": 297,
+        "rtt_ms": 7.43387,
+        "jitter_ms": 0.04145629599416179,
+        "loss_pct": 0.0
+      },
+      "6": {
+        "sample_count": 300,
+        "rtt_ms": 7.5493239999999995,
+        "jitter_ms": 0.044059064300009707,
+        "loss_pct": 0.0
+      },
+      "7": {
+        "sample_count": 297,
+        "rtt_ms": 7.610784333333332,
+        "jitter_ms": 0.04862236033166552,
+        "loss_pct": 0.0
+      },
+      "8": {
+        "sample_count": 294,
+        "rtt_ms": 7.555726333333332,
+        "jitter_ms": 0.043966652029034325,
+        "loss_pct": 0.0
+      },
+      "9": {
+        "sample_count": 298,
+        "rtt_ms": 7.811861166666667,
+        "jitter_ms": 0.05171096604106671,
+        "loss_pct": 0.0
+      },
+      "10": {
+        "sample_count": 295,
+        "rtt_ms": 7.942510666666666,
+        "jitter_ms": 0.05597684071113695,
+        "loss_pct": 0.0
+      },
+      "11": {
+        "sample_count": 298,
+        "rtt_ms": 8.058916166666666,
+        "jitter_ms": 0.05042900038671104,
+        "loss_pct": 0.0
+      },
+      "12": {
+        "sample_count": 299,
+        "rtt_ms": 8.269731333333334,
+        "jitter_ms": 0.044524962040036205,
+        "loss_pct": 0.0
+      },
+      "13": {
+        "sample_count": 294,
+        "rtt_ms": 8.324717333333332,
+        "jitter_ms": 0.050453374424636946,
+        "loss_pct": 0.0
+      },
+      "14": {
+        "sample_count": 301,
+        "rtt_ms": 8.001093333333333,
+        "jitter_ms": 0.04459212634037255,
+        "loss_pct": 0.0
+      },
+      "15": {
+        "sample_count": 290,
+        "rtt_ms": 8.1707405,
+        "jitter_ms": 0.04274184622170979,
+        "loss_pct": 0.0
+      },
+      "16": {
+        "sample_count": 291,
+        "rtt_ms": 8.079793666666667,
+        "jitter_ms": 0.04155619593059766,
+        "loss_pct": 0.0
+      },
+      "17": {
+        "sample_count": 297,
+        "rtt_ms": 8.284253666666666,
+        "jitter_ms": 0.043701857964573716,
+        "loss_pct": 0.0
+      },
+      "18": {
+        "sample_count": 295,
+        "rtt_ms": 8.331689666666668,
+        "jitter_ms": 0.04833549472178839,
+        "loss_pct": 0.0
+      },
+      "19": {
+        "sample_count": 295,
+        "rtt_ms": 8.114797666666666,
+        "jitter_ms": 0.04531499111282881,
+        "loss_pct": 0.0
+      },
+      "20": {
+        "sample_count": 293,
+        "rtt_ms": 7.927429,
+        "jitter_ms": 0.04604739787074472,
+        "loss_pct": 0.0
+      },
+      "21": {
+        "sample_count": 298,
+        "rtt_ms": 7.9019363333333335,
+        "jitter_ms": 0.043603682430102125,
+        "loss_pct": 0.0
+      },
+      "22": {
+        "sample_count": 297,
+        "rtt_ms": 7.943615,
+        "jitter_ms": 0.04487730574453963,
+        "loss_pct": 0.0
+      },
+      "23": {
+        "sample_count": 297,
+        "rtt_ms": 7.857167666666666,
+        "jitter_ms": 0.04756501525514548,
+        "loss_pct": 0.0
+      }
+    }
+  },
+  "role_medians": {
+    "public_dns_reachability_proxy": {
+      "sample_count": 11127,
+      "rtt_ms": 16.325819,
+      "jitter_ms": 0.05650035257903673,
+      "loss_pct": 0.0
+    }
+  },
+  "role_hourly_stats": {
+    "public_dns_reachability_proxy": {
+      "0": {
+        "sample_count": 469,
+        "rtt_ms": 16.318362,
+        "jitter_ms": 0.05606639365569698,
+        "loss_pct": 0.0
+      },
+      "1": {
+        "sample_count": 459,
+        "rtt_ms": 16.305560333333332,
+        "jitter_ms": 0.047581405011715525,
+        "loss_pct": 0.0
+      },
+      "2": {
+        "sample_count": 463,
+        "rtt_ms": 16.31138066666667,
+        "jitter_ms": 0.048643767482473954,
+        "loss_pct": 0.0
+      },
+      "3": {
+        "sample_count": 454,
+        "rtt_ms": 16.299233833333332,
+        "jitter_ms": 0.05005642229728814,
+        "loss_pct": 0.0
+      },
+      "4": {
+        "sample_count": 466,
+        "rtt_ms": 16.305297833333334,
+        "jitter_ms": 0.050188871381498454,
+        "loss_pct": 0.0
+      },
+      "5": {
+        "sample_count": 467,
+        "rtt_ms": 16.272119666666665,
+        "jitter_ms": 0.049732176512460764,
+        "loss_pct": 0.0
+      },
+      "6": {
+        "sample_count": 467,
+        "rtt_ms": 16.279111999999998,
+        "jitter_ms": 0.048783355979951454,
+        "loss_pct": 0.0
+      },
+      "7": {
+        "sample_count": 466,
+        "rtt_ms": 16.251087666666663,
+        "jitter_ms": 0.056497728904253364,
+        "loss_pct": 0.0
+      },
+      "8": {
+        "sample_count": 461,
+        "rtt_ms": 16.26824433333333,
+        "jitter_ms": 0.05048028711839256,
+        "loss_pct": 0.0
+      },
+      "9": {
+        "sample_count": 466,
+        "rtt_ms": 16.289545333333336,
+        "jitter_ms": 0.06299181200417098,
+        "loss_pct": 0.0
+      },
+      "10": {
+        "sample_count": 459,
+        "rtt_ms": 16.33685266666667,
+        "jitter_ms": 0.06467928693175273,
+        "loss_pct": 0.0
+      },
+      "11": {
+        "sample_count": 467,
+        "rtt_ms": 16.401758,
+        "jitter_ms": 0.06545249046955104,
+        "loss_pct": 0.0
+      },
+      "12": {
+        "sample_count": 470,
+        "rtt_ms": 16.461637,
+        "jitter_ms": 0.06354847995368651,
+        "loss_pct": 0.0
+      },
+      "13": {
+        "sample_count": 464,
+        "rtt_ms": 16.358806,
+        "jitter_ms": 0.06573944022923481,
+        "loss_pct": 0.0
+      },
+      "14": {
+        "sample_count": 469,
+        "rtt_ms": 16.402351333333332,
+        "jitter_ms": 0.05947983257280477,
+        "loss_pct": 0.0
+      },
+      "15": {
+        "sample_count": 457,
+        "rtt_ms": 16.454457666666666,
+        "jitter_ms": 0.056780130587692434,
+        "loss_pct": 0.0
+      },
+      "16": {
+        "sample_count": 457,
+        "rtt_ms": 16.347939666666665,
+        "jitter_ms": 0.05133088025956911,
+        "loss_pct": 0.0
+      },
+      "17": {
+        "sample_count": 467,
+        "rtt_ms": 16.332949333333335,
+        "jitter_ms": 0.05449381874630879,
+        "loss_pct": 0.0
+      },
+      "18": {
+        "sample_count": 462,
+        "rtt_ms": 16.360720166666667,
+        "jitter_ms": 0.06418695557570152,
+        "loss_pct": 0.0
+      },
+      "19": {
+        "sample_count": 461,
+        "rtt_ms": 16.337348666666667,
+        "jitter_ms": 0.06288754541242648,
+        "loss_pct": 0.0
+      },
+      "20": {
+        "sample_count": 458,
+        "rtt_ms": 16.338292666666668,
+        "jitter_ms": 0.06434506354115789,
+        "loss_pct": 0.0
+      },
+      "21": {
+        "sample_count": 466,
+        "rtt_ms": 16.3493635,
+        "jitter_ms": 0.06587463696598783,
+        "loss_pct": 0.0
+      },
+      "22": {
+        "sample_count": 467,
+        "rtt_ms": 16.319249666666668,
+        "jitter_ms": 0.061243529851459956,
+        "loss_pct": 0.0
+      },
+      "23": {
+        "sample_count": 465,
+        "rtt_ms": 16.325295999999998,
+        "jitter_ms": 0.0631476448491937,
+        "loss_pct": 0.0
+      }
+    }
+  },
+  "role_proxy": {
+    "enabled": true,
+    "role": "public_dns_reachability_proxy",
+    "source_targets": [
+      "192.5.5.241",
+      "193.0.14.129"
+    ],
+    "configured_targets": [
+      "1.1.1.1",
+      "8.8.8.8"
+    ],
+    "opt_in_required": [
+      "exact target-role map",
+      "--allow-role-proxy"
+    ],
+    "uncertainty": "These are public root-DNS-server ping paths. Their RTT, jitter, and loss are reachability proxies, not DNS lookup timing or proof of route equivalence to 1.1.1.1 or 8.8.8.8.",
+    "status": "enabled by explicit mapping and CLI flag"
+  },
+  "target_roles": {
+    "192.5.5.241": "public_dns_reachability_proxy",
+    "193.0.14.129": "public_dns_reachability_proxy"
+  },
+  "hourly": [
+    {
+      "hour_pk": 0,
+      "rtt_ms": 16.318362,
+      "jitter_ms": 0.05606639365569698,
+      "loss_pct": 0.0,
+      "sample_count": 469
+    },
+    {
+      "hour_pk": 1,
+      "rtt_ms": 16.305560333333332,
+      "jitter_ms": 0.047581405011715525,
+      "loss_pct": 0.0,
+      "sample_count": 459
+    },
+    {
+      "hour_pk": 2,
+      "rtt_ms": 16.31138066666667,
+      "jitter_ms": 0.048643767482473954,
+      "loss_pct": 0.0,
+      "sample_count": 463
+    },
+    {
+      "hour_pk": 3,
+      "rtt_ms": 16.299233833333332,
+      "jitter_ms": 0.05005642229728814,
+      "loss_pct": 0.0,
+      "sample_count": 454
+    },
+    {
+      "hour_pk": 4,
+      "rtt_ms": 16.305297833333334,
+      "jitter_ms": 0.050188871381498454,
+      "loss_pct": 0.0,
+      "sample_count": 466
+    },
+    {
+      "hour_pk": 5,
+      "rtt_ms": 16.272119666666665,
+      "jitter_ms": 0.049732176512460764,
+      "loss_pct": 0.0,
+      "sample_count": 467
+    },
+    {
+      "hour_pk": 6,
+      "rtt_ms": 16.279111999999998,
+      "jitter_ms": 0.048783355979951454,
+      "loss_pct": 0.0,
+      "sample_count": 467
+    },
+    {
+      "hour_pk": 7,
+      "rtt_ms": 16.251087666666663,
+      "jitter_ms": 0.056497728904253364,
+      "loss_pct": 0.0,
+      "sample_count": 466
+    },
+    {
+      "hour_pk": 8,
+      "rtt_ms": 16.26824433333333,
+      "jitter_ms": 0.05048028711839256,
+      "loss_pct": 0.0,
+      "sample_count": 461
+    },
+    {
+      "hour_pk": 9,
+      "rtt_ms": 16.289545333333336,
+      "jitter_ms": 0.06299181200417098,
+      "loss_pct": 0.0,
+      "sample_count": 466
+    },
+    {
+      "hour_pk": 10,
+      "rtt_ms": 16.33685266666667,
+      "jitter_ms": 0.06467928693175273,
+      "loss_pct": 0.0,
+      "sample_count": 459
+    },
+    {
+      "hour_pk": 11,
+      "rtt_ms": 16.401758,
+      "jitter_ms": 0.06545249046955104,
+      "loss_pct": 0.0,
+      "sample_count": 467
+    },
+    {
+      "hour_pk": 12,
+      "rtt_ms": 16.461637,
+      "jitter_ms": 0.06354847995368651,
+      "loss_pct": 0.0,
+      "sample_count": 470
+    },
+    {
+      "hour_pk": 13,
+      "rtt_ms": 16.358806,
+      "jitter_ms": 0.06573944022923481,
+      "loss_pct": 0.0,
+      "sample_count": 464
+    },
+    {
+      "hour_pk": 14,
+      "rtt_ms": 16.402351333333332,
+      "jitter_ms": 0.05947983257280477,
+      "loss_pct": 0.0,
+      "sample_count": 469
+    },
+    {
+      "hour_pk": 15,
+      "rtt_ms": 16.454457666666666,
+      "jitter_ms": 0.056780130587692434,
+      "loss_pct": 0.0,
+      "sample_count": 457
+    },
+    {
+      "hour_pk": 16,
+      "rtt_ms": 16.347939666666665,
+      "jitter_ms": 0.05133088025956911,
+      "loss_pct": 0.0,
+      "sample_count": 457
+    },
+    {
+      "hour_pk": 17,
+      "rtt_ms": 16.332949333333335,
+      "jitter_ms": 0.05449381874630879,
+      "loss_pct": 0.0,
+      "sample_count": 467
+    },
+    {
+      "hour_pk": 18,
+      "rtt_ms": 16.360720166666667,
+      "jitter_ms": 0.06418695557570152,
+      "loss_pct": 0.0,
+      "sample_count": 462
+    },
+    {
+      "hour_pk": 19,
+      "rtt_ms": 16.337348666666667,
+      "jitter_ms": 0.06288754541242648,
+      "loss_pct": 0.0,
+      "sample_count": 461
+    },
+    {
+      "hour_pk": 20,
+      "rtt_ms": 16.338292666666668,
+      "jitter_ms": 0.06434506354115789,
+      "loss_pct": 0.0,
+      "sample_count": 458
+    },
+    {
+      "hour_pk": 21,
+      "rtt_ms": 16.3493635,
+      "jitter_ms": 0.06587463696598783,
+      "loss_pct": 0.0,
+      "sample_count": 466
+    },
+    {
+      "hour_pk": 22,
+      "rtt_ms": 16.319249666666668,
+      "jitter_ms": 0.061243529851459956,
+      "loss_pct": 0.0,
+      "sample_count": 467
+    },
+    {
+      "hour_pk": 23,
+      "rtt_ms": 16.325295999999998,
+      "jitter_ms": 0.0631476448491937,
+      "loss_pct": 0.0,
+      "sample_count": 465
+    }
+  ],
+  "observation_count": 11819,
+  "input_files": [
+    "data\\raw\\ripe\\results.parquet"
+  ],
+  "time_range_utc": {
+    "start": "2026-10-11T00:00:26+00:00",
+    "end": "2026-10-17T23:59:48+00:00"
+  }
+}

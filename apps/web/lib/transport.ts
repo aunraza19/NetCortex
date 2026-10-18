@@ -1,0 +1,586 @@
+import type { components, paths } from "./generated/openapi";
+import {
+  initialIncidents,
+  makeSeries,
+  sites as fixtureSites,
+} from "./fixtures";
+import type { Incident, IncidentStatus, Point, Scenario, Site } from "./types";
+
+type ApiSite = components["schemas"]["SiteHealth"];
+type ApiSummary = components["schemas"]["IncidentSummary"];
+type ApiDetail = components["schemas"]["IncidentDetail"];
+type ApiSeries = components["schemas"]["Series"];
+type ApiHealth = components["schemas"]["Health"];
+
+export interface InjectionResult {
+  incident?: Incident;
+  message: string;
+}
+export interface Transport {
+  sites(): Promise<Site[]>;
+  incidents(status?: string, siteId?: string): Promise<Incident[]>;
+  incident(id: string): Promise<Incident>;
+  metrics(siteId: string): Promise<Point[]>;
+  inject(
+    siteId: string,
+    scenario: Scenario,
+    duration: number,
+  ): Promise<InjectionResult>;
+  decide(
+    id: string,
+    decision: "approve" | "reject",
+    onUpdate?: (incident: Incident) => void,
+  ): Promise<Incident>;
+  health(): Promise<ApiHealth | null>;
+  subscribe(
+    onEvent: (event: MessageEvent) => void,
+    onReconnect: () => void,
+  ): () => void;
+}
+
+const configuredMode = process.env.NEXT_PUBLIC_API_MODE ?? "mock";
+const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+export const apiMode = configuredMode === "live" ? "live" : "mock";
+const unavailable = "—";
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 7000,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+    });
+    if (!response.ok)
+      throw new Error(`API request failed (${response.status}). Try again.`);
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof Error && error.name !== "AbortError") throw error;
+    throw new Error(
+      "The API could not be reached. Check the connection and try again.",
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type ApiPath = keyof paths;
+const apiPath = <P extends ApiPath>(path: P): P => path;
+
+function adaptSite(site: ApiSite): Site {
+  const primary =
+    site.uplinks.find((uplink) => uplink.role === "primary") ?? site.uplinks[0];
+  const backup = site.uplinks.find((uplink) => uplink.role === "backup");
+  const uplinkName =
+    primary && typeof primary.iface === "string" ? primary.iface : null;
+  const backupName =
+    backup && typeof backup.iface === "string" ? backup.iface : null;
+  return {
+    id: site.id,
+    name: site.name,
+    location: unavailable,
+    subscribers: null,
+    health: site.health,
+    utilization: site.uplink_util_pct ?? null,
+    latency: site.worst_rtt_ms ?? null,
+    loss: site.max_loss_pct ?? null,
+    uplink: uplinkName ?? unavailable,
+    backupUplink: backupName ?? undefined,
+  };
+}
+
+function adaptDetail(detail: ApiDetail, siteName: string): Incident {
+  const source = detail.incident;
+  const report = source.report;
+  const plan = detail.fix_plan;
+  return {
+    id: source.id ?? "",
+    siteId: source.site_id,
+    siteName,
+    cause: source.cause,
+    title: report?.summary ?? unavailable,
+    status: source.status,
+    confidence: report?.confidence ?? source.confidence,
+    openedAt: source.opened_at,
+    summary: report?.summary ?? unavailable,
+    evidence: report?.evidence ?? [],
+    template: report?.template_id ?? plan?.template_id ?? "none",
+    fix: plan?.commands ? [plan.commands] : [],
+    rollback: plan?.rollback ? [plan.rollback] : [],
+    dryRun:
+      plan?.dry_run_ok == null
+        ? "pending"
+        : plan.dry_run_ok
+          ? "passed"
+          : "failed",
+    dryRunMessage: plan?.dry_run_log || unavailable,
+    customerMessageEn: report?.customer_message_en ?? unavailable,
+    customerMessageUr: report?.customer_message_ur ?? unavailable,
+    news: report?.upstream_check
+      ? {
+          label: report.upstream_check.available
+            ? report.upstream_check.summary
+            : `Check unavailable: ${report.upstream_check.summary}`,
+          url: report.upstream_check.items[0]?.url,
+        }
+      : undefined,
+    timeline: detail.timeline.map((event) => {
+      const payload = event.payload;
+      const label =
+        typeof payload.label === "string" ? payload.label : event.kind;
+      const description =
+        typeof payload.detail === "string" ? payload.detail : "";
+      return {
+        at: event.time,
+        label,
+        detail: description,
+        state: "done" as const,
+      };
+    }),
+  };
+}
+
+function adaptSummary(summary: ApiSummary, siteName: string): Incident {
+  return {
+    id: summary.id,
+    siteId: summary.site_id,
+    siteName,
+    cause: summary.cause as Incident["cause"],
+    title: summary.summary ?? unavailable,
+    status: summary.status,
+    confidence: summary.confidence,
+    openedAt: summary.opened_at,
+    summary: summary.summary ?? unavailable,
+    evidence: [],
+    template: summary.template_id ?? "none",
+    fix: [],
+    rollback: [],
+    dryRun: "pending",
+    dryRunMessage: unavailable,
+    customerMessageEn: unavailable,
+    customerMessageUr: unavailable,
+    timeline: [],
+  };
+}
+
+function adaptSeries(series: ApiSeries[]): Point[] {
+  const points = new Map<string, Point>();
+  for (const row of series) {
+    for (const point of row.points) {
+      const time = new Date(point.time).toLocaleTimeString("en-PK", {
+        timeZone: "Asia/Karachi",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      points.set(point.time, {
+        ...(points.get(point.time) ?? {
+          time,
+          actual: null,
+          p10: null,
+          p50: null,
+          p90: null,
+        }),
+        actual: point.value,
+      });
+    }
+    for (const band of row.forecast) {
+      const time = new Date(band.time).toLocaleTimeString("en-PK", {
+        timeZone: "Asia/Karachi",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      points.set(band.time, {
+        ...(points.get(band.time) ?? {
+          time,
+          actual: null,
+          p10: null,
+          p50: null,
+          p90: null,
+        }),
+        p10: band.p10,
+        p50: band.p50,
+        p90: band.p90,
+      });
+    }
+  }
+  return [...points.entries()]
+    .sort(([a], [b]) => Date.parse(a) - Date.parse(b))
+    .map(([, point]) => point);
+}
+
+let mockIncidents = initialIncidents.map((incident) => ({ ...incident }));
+const pause = (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
+const activeStatuses = ["open", "awaiting_approval", "applying", "verifying"];
+
+function currentSites(): Site[] {
+  return fixtureSites.map((site) => {
+    const active = mockIncidents.filter(
+      (incident) =>
+        incident.siteId === site.id && activeStatuses.includes(incident.status),
+    );
+    const severe = active.some((incident) => incident.cause === "uplink_down");
+    return active.length
+      ? { ...site, health: severe ? "down" : "degraded" }
+      : site;
+  });
+}
+
+function update(
+  id: string,
+  status: IncidentStatus,
+  label: string,
+  detail = "Recorded by the local replay.",
+) {
+  mockIncidents = mockIncidents.map((incident) =>
+    incident.id === id
+      ? {
+          ...incident,
+          status,
+          timeline: [
+            ...incident.timeline,
+            { at: new Date().toISOString(), label, detail, state: "done" },
+          ],
+        }
+      : incident,
+  );
+}
+
+function newMockIncident(
+  site: Site,
+  scenario: Scenario,
+  duration: number,
+): Incident {
+  const noFix = [
+    "upstream_degradation",
+    "game_route_issue",
+    "wireless_interference",
+  ].includes(scenario);
+  const noBackup = scenario === "uplink_down" && !site.backupUplink;
+  const adviceOnly = noFix || noBackup;
+  const templates: Partial<Record<Scenario, string>> = {
+    uplink_congestion: "priority_queue",
+    heavy_user: "queue_limit",
+    uplink_down: "failover_route",
+    dns_slow: "dns_servers",
+  };
+  const commands: Partial<Record<Scenario, string[]>> = {
+    uplink_congestion: [
+      "/queue tree add name=demo-priority parent=global packet-mark=priority priority=1",
+    ],
+    heavy_user: [
+      "/queue simple add name=demo-user target=192.0.2.8/32 max-limit=10M/10M",
+    ],
+    uplink_down: ['/ip route set [find comment="primary"] distance=2'],
+    dns_slow: ["/ip dns set servers=1.1.1.1,8.8.8.8"],
+  };
+  const rollback: Partial<Record<Scenario, string[]>> = {
+    uplink_congestion: ['/queue tree remove [find name="demo-priority"]'],
+    heavy_user: ['/queue simple remove [find name="demo-user"]'],
+    uplink_down: ['/ip route set [find comment="primary"] distance=1'],
+    dns_slow: ["/ip dns set servers=192.0.2.53"],
+  };
+  const timestamp = new Date().toISOString();
+  const id = `INC-${2085 + mockIncidents.length}`;
+  return {
+    ...mockIncidents[0],
+    id,
+    siteId: site.id,
+    siteName: site.name,
+    cause: scenario === "normal" ? "upstream_degradation" : scenario,
+    title:
+      scenario === "normal"
+        ? `Normal traffic at ${site.name}`
+        : `${scenario.replaceAll("_", " ")} at ${site.name}`,
+    status: "awaiting_approval",
+    openedAt: timestamp,
+    summary: noBackup
+      ? `The primary uplink is down at ${site.name}, which has no configured backup uplink. The replay provides notify-only guidance; no route change is proposed.`
+      : `A ${scenario.replaceAll("_", " ")} replay was injected at ${site.name}. Review the recorded evidence${adviceOnly ? " and service guidance" : " and router test"} before deciding.`,
+    template: adviceOnly ? "none" : (templates[scenario] ?? "none"),
+    fix: adviceOnly ? [] : (commands[scenario] ?? []),
+    rollback: adviceOnly ? [] : (rollback[scenario] ?? []),
+    dryRun: adviceOnly ? "pending" : "passed",
+    dryRunMessage: noBackup
+      ? "No backup uplink is configured. Notify-only guidance; no router change or CHR test is available."
+      : adviceOnly
+        ? "No router change proposed for this scenario."
+        : "CHR test simulated · replay fixture only · no router command was sent",
+    simulatedOutcome:
+      scenario === "uplink_down" && !noBackup ? "rolled_back" : "resolved",
+    evidence: noBackup
+      ? [
+          `Primary uplink down for ${duration} minutes`,
+          "No backup uplink is configured for this site",
+        ]
+      : [
+          `${scenario.replaceAll("_", " ")} signal replayed for ${duration} minutes`,
+          `Sample evidence recorded at ${site.name}`,
+        ],
+    customerMessageEn:
+      "This replay is for review. Check the recorded evidence and proposed service action.",
+    customerMessageUr:
+      "یہ منظرنامہ جائزے کے لیے دوبارہ چلایا گیا ہے۔ درج شدہ شواہد اور تجویز کردہ کارروائی دیکھیں۔",
+    timeline: [
+      {
+        at: timestamp,
+        label: "Demo incident replayed",
+        detail: "Scenario and evidence generated from the local fixture.",
+        state: "done",
+      },
+      ...(!adviceOnly
+        ? [
+            {
+              at: timestamp,
+              label: "Router test passed",
+              detail: "Fixture result only. No CHR was contacted.",
+              state: "done" as const,
+            },
+          ]
+        : []),
+      {
+        at: timestamp,
+        label: "Waiting for your decision",
+        detail: "Approval advances the local simulation only.",
+        state: "active",
+      },
+    ],
+  };
+}
+
+const endpoint = {
+  health: apiPath("/health"),
+  sites: apiPath("/sites"),
+  metrics: apiPath("/metrics"),
+  incidents: apiPath("/incidents"),
+  incident: (id: string) => `/incidents/${encodeURIComponent(id)}`,
+  decide: (id: string, action: string) =>
+    `/incidents/${encodeURIComponent(id)}/${action}`,
+};
+
+export const transport: Transport = {
+  async health() {
+    return apiMode === "live" ? request<ApiHealth>(endpoint.health) : null;
+  },
+  async sites() {
+    return apiMode === "live"
+      ? (await request<ApiSite[]>(endpoint.sites)).map(adaptSite)
+      : (await pause(), currentSites());
+  },
+  async incidents(status, siteId) {
+    if (apiMode === "live") {
+      const query = new URLSearchParams();
+      if (status) query.set("status", status);
+      const [items, sites] = await Promise.all([
+        request<ApiSummary[]>(
+          `${endpoint.incidents}${query.size ? `?${query}` : ""}`,
+        ),
+        request<ApiSite[]>(endpoint.sites),
+      ]);
+      const names = new Map(sites.map((site) => [site.id, site.name]));
+      return items
+        .filter((item) => !siteId || item.site_id === siteId)
+        .map((item) =>
+          adaptSummary(item, names.get(item.site_id) ?? unavailable),
+        );
+    }
+    await pause();
+    return mockIncidents
+      .filter(
+        (item) =>
+          (!status || item.status === status) &&
+          (!siteId || item.siteId === siteId),
+      )
+      .sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt));
+  },
+  async incident(id) {
+    if (apiMode === "live") {
+      const [detail, sites] = await Promise.all([
+        request<ApiDetail>(endpoint.incident(id)),
+        request<ApiSite[]>(endpoint.sites),
+      ]);
+      return adaptDetail(
+        detail,
+        sites.find((site) => site.id === detail.incident.site_id)?.name ??
+          unavailable,
+      );
+    }
+    await pause();
+    const found = mockIncidents.find((item) => item.id === id);
+    if (!found)
+      throw new Error("Incident not found. Refresh the list and try again.");
+    return found;
+  },
+  async metrics(siteId) {
+    if (apiMode === "mock") {
+      await pause();
+      return makeSeries();
+    }
+    const to = new Date();
+    const from = new Date(to.getTime() - 86400000);
+    const query = new URLSearchParams({
+      site_id: siteId,
+      series: "probe:1.1.1.1:rtt_ms",
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    return adaptSeries(
+      await request<ApiSeries[]>(`${endpoint.metrics}?${query}`),
+    );
+  },
+  async inject(siteId, scenario, duration) {
+    if (apiMode === "live") {
+      const health = await this.health();
+      if (health?.demo_mode !== false)
+        throw new Error(
+          "Scenarios require a confirmed live API mode; saved replay and unknown mode are read only.",
+        );
+      await request<components["schemas"]["ScenarioLabel"]>(
+        "/demo/scenarios",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            site_id: siteId,
+            scenario_type: scenario,
+            duration_min: duration,
+          }),
+        },
+        30000,
+      );
+      return {
+        message:
+          "Diagnosis queued. The API will report its result in the incident list.",
+      };
+    }
+    await pause(250);
+    const site = currentSites().find((item) => item.id === siteId);
+    if (!site) throw new Error("Choose a site before replaying a scenario.");
+    if (scenario === "normal")
+      return {
+        message:
+          "Normal traffic replayed. No incident or router change was created.",
+      };
+    const incident = newMockIncident(site, scenario, duration);
+    mockIncidents = [incident, ...mockIncidents];
+    return incident.template === "none"
+      ? {
+          incident,
+          message:
+            "Scenario replayed. It provides guidance only; no router change is proposed.",
+        }
+      : {
+          incident,
+          message: "Scenario replayed. A reviewable incident is ready.",
+        };
+  },
+  async decide(id, decision, onUpdate) {
+    if (apiMode === "live") {
+      const before = await this.incident(id);
+      if (before.status !== "awaiting_approval")
+        throw new Error(
+          "Only incidents awaiting approval can receive a decision.",
+        );
+      await request<components["schemas"]["Accepted"]>(
+        endpoint.decide(id, decision),
+        { method: "POST", body: JSON.stringify({ decided_by: "owner" }) },
+        30000,
+      );
+      const authoritative = await this.incident(id);
+      onUpdate?.(authoritative);
+      return authoritative;
+    }
+    await pause(250);
+    const current = mockIncidents.find((item) => item.id === id);
+    if (!current) throw new Error("Incident not found.");
+    if (current.status !== "awaiting_approval")
+      throw new Error(
+        "This incident is no longer available for that decision.",
+      );
+    if (decision === "reject") {
+      update(id, "rejected", "Change rejected");
+      return this.incident(id);
+    }
+    if (
+      current.template === "none" ||
+      current.dryRun !== "passed" ||
+      !current.fix.length
+    )
+      throw new Error("This incident is not eligible for approval.");
+    update(
+      id,
+      "applying",
+      "Applying simulated change",
+      "Local fixture only; no router command was sent.",
+    );
+    onUpdate?.(await this.incident(id));
+    await pause(400);
+    update(
+      id,
+      "verifying",
+      "Verifying simulated change",
+      "Fixture outcome only.",
+    );
+    onUpdate?.(await this.incident(id));
+    await pause(500);
+    const outcome = current.simulatedOutcome ?? "resolved";
+    update(
+      id,
+      outcome,
+      outcome === "rolled_back"
+        ? "Simulated check failed; rollback completed"
+        : "Simulation resolved",
+      "Simulated replay outcome; no router command was sent.",
+    );
+    return this.incident(id);
+  },
+  subscribe(onEvent, onReconnect) {
+    if (apiMode !== "live") {
+      const timer = setTimeout(onReconnect, 45000);
+      return () => clearTimeout(timer);
+    }
+    const source = new EventSource(`${base}/stream`);
+    const seen = new Set<string>();
+    const events: components["schemas"]["EventKind"][] = [
+      "metric",
+      "incident.opened",
+      "incident.updated",
+      "fix.tested",
+      "fix.applied",
+    ];
+    const listeners = events.map((name) => {
+      const listener = (raw: Event) => {
+        const event = raw as MessageEvent;
+        const key = event.lastEventId
+          ? `${event.type}:${event.lastEventId}`
+          : "";
+        if (key && seen.has(key)) return;
+        if (key) {
+          seen.add(key);
+          if (seen.size > 500)
+            seen.delete(seen.values().next().value as string);
+        }
+        onEvent(event);
+      };
+      source.addEventListener(name, listener);
+      return [name, listener] as const;
+    });
+    let opened = false;
+    source.onopen = () => {
+      if (opened) onReconnect();
+      opened = true;
+    };
+    source.onerror = onReconnect;
+    return () => {
+      listeners.forEach(([name, listener]) =>
+        source.removeEventListener(name, listener),
+      );
+      source.close();
+    };
+  },
+};

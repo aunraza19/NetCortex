@@ -1,0 +1,137 @@
+# NetCortex: entry points, connections and exits
+
+This map distinguishes the partner's code from Aun's shared runtime.
+Package `flow.md` files give exact implementation-level names and examples.
+This document is updated as each component is integrated.
+
+```mermaid
+flowchart TD
+    R[RIPE Atlas public API] --> S[Partner: simulator / calibration]
+    S --> P[Ignored Parquet datasets + evaluation cases]
+    S --> DB[(Aun: shared database contract)]
+    C[Aun: live collector] --> DB
+    DB --> W[Aun: monitor workflow]
+    W --> D[Partner: detect]
+    D --> F[Forecasts + detection evidence]
+    F --> A[Aun: investigate agent]
+    A --> K[Partner: search_runbook]
+    MD[Official MikroTik documentation] --> K
+    O[Ollama EmbeddingGemma] --> K
+    K <--> DB
+    A --> N[Partner: check_news]
+    N --> SE[SerpApi]
+    A --> X[Aun: template checker / isolated CHR]
+    X --> API[Aun: FastAPI + SSE]
+    API <--> UI[Partner: Next.js dashboard]
+    UI --> Q{Human decision}
+    Q -->|approve| IW[Aun: incident workflow]
+    Q -->|reject| REJ[Rejected; no router apply]
+    IW --> VERIFY[Apply on demo CHR and verify]
+    VERIFY --> END[Resolved or rolled back]
+    END --> API
+    CASES[Eval TRAIN / VALIDATION / TEST] --> EVAL[eval/run.py]
+    EVAL --> DET[Detector result mapped to core DetectionResult]
+    DET --> INV[netcortex_agent.investigate]
+    INV --> VAL[netcortex_fixes.validate]
+    VAL --> CHR[Optional netcortex_fixes.dry_run on CHR]
+    CHR --> REPORT[Eval measurements and denominators]
+    SNAP[Saved real-run snapshot] --> DEMO[API DemoStore, DEMO_MODE=true]
+    DEMO <--> UI
+```
+
+## Entry and exit points
+
+| Entry | Inputs | Connection / processing | Exit |
+| --- | --- | --- | --- |
+| `simgen ripe` | requested days, cache location | Discover PK probes/measurements; bounded RIPE downloads | Local raw dataset with source provenance; error on unavailable API |
+| `simgen calibrate` | real baseline rows, optional exact target-role map and explicit proxy opt-in | Group statistics by target and Pakistan hour; restrict proxy transfer to public DNS ping roles | Calibration/report with coverage, defaults, source targets and transfer uncertainty |
+| `simgen generate` | days, seed, scenario configuration | Seeded demand/noise and incident transforms | Probe/interface Parquet plus separate expected labels |
+| `simgen replay` / `inject` | site, cause, duration, seed | Active simulator runtime; DB writes need Aun's keys/runtime agreement | Current metrics and scenario label; explicit missing-runtime/contract failure |
+| `detect(site_id, window, history)` | observed shared MetricsWindow | Lag features -> prepared TabPFN forecasts/anomaly/cause | Shared DetectionResult, or unavailable error; worker owns forecast writes |
+| `search_runbook(query, k)` | question and result count | Ollama query embedding -> pgvector retrieval | Shared RunbookChunk objects with source URLs |
+| `check_news(provider, target)` | upstream provider/target | Recent SerpApi search | Shared NewsCheck with links; explicit unavailable summary on failure |
+| Dashboard navigation | site/incident selection | Fixture transport or Aun's HTTP API | Rendered status/evidence, loading state or visible error |
+| Dashboard decision | confirmed approve/reject | POST to Aun; GET authoritative incident after acknowledgement; workflow owns subsequent state | Acknowledged decision, followed by SSE/refetch; no assumed live success |
+| Evaluation runner | `eval/run.py --mode mock|cloud|local`; optional `--with-agent`, `--chr-dry-run` | TEST detector output -> core `DetectionResult` and case `MetricsWindow` -> merged async investigator -> `validate`; optional configured CHR `dry_run` | Markdown with actual scores and denominators; agent/parameter/CHR metrics stay unavailable unless those integrations ran |
+
+## HTTP boundary owned by Aun
+
+The merged API exposes `GET /health`, `/sites`, `/metrics`, `/incidents`,
+`/incidents/{id}`, `POST /incidents/{id}/approve`, `/incidents/{id}/reject`,
+`POST /demo/scenarios`, `GET /stream`, and `/openapi.json`. The UI's generated
+types are in `apps/web/lib/generated/openapi.ts`. SSE event names are `metric`,
+`incident.opened`, `incident.updated`, `fix.tested` and `fix.applied`. Reconnect
+refreshes state; approve/reject acknowledgements are followed by authoritative
+GET/SSE state rather than assumed completion.
+
+## Fixture and live exits
+
+Fixture mode uses explicitly simulated data and transitions and displays
+"Demo: replayed data". It does not apply router commands or establish provider,
+model or API integration. Live mode reports a failed dependency instead of
+switching to fixture data. Approval requires a valid actionable plan with a
+passing CHR check and an appropriate incident state.
+
+## Hosting and validation boundary
+
+Render runs the dashboard's Node/Next.js server and merged FastAPI replay service
+with `DEMO_MODE=true`; the browser does not hold database or provider secrets.
+The web service calls the API's public Render URL. The API allows its web origin
+through CORS. Custom `.tech` domain attachment and DNS verification require the
+domain name and Render/DNS account access. Sentry receives optional
+frontend monitoring when configured. CI checks offline Python/frontend behavior;
+the separate CHR workflow boots a pinned router and checks authenticated REST.
+Its template job runs only when Aun's actual test harness exists; boot success
+alone does not establish template validity. External authentication is setup,
+not an automatic claim of a working connection.
+
+## Merged core boundary
+
+simgen.inject enters a site-locked transaction, preserves existing Site topology,
+inserts sim ProbeMetric/IfaceMetric/SubscriberMetric observations and one
+ScenarioLabel, then commits or rolls back together. DNS uses kind=dns and target
+dns:1.1.1.1. The detector consumes actual MetricsWindow inputs and returns
+DetectionResult with canonical SeriesForecast/ForecastPoint data. detect performs
+no forecast writes; MonitorSiteWorkflow owns persistence. Core exposes fetch_site.
+
+The detector needs an explicitly prepared real TabPFN context for cloud/local
+inference. `prepare_detector()` reads TRAIN and normal VALIDATION observations,
+without reading TEST labels. `configure_detector()` fits provider state once at
+worker startup. A full-series cloud run measured 99.1 seconds for setup and 62.1
+seconds for detect; these numbers establish integration timing for that run only.
+Provider failures remain unavailable.
+
+Gate 2 entry is `python eval/gate2.py`. It calls `prepare_detector(cases, artifact)`
+for TRAIN/VALIDATION JSON and Parquet, then `configure_detector(artifact)` to fit
+and cache the real provider. The runner seeds bounded simulated history for
+north-tower, calls public simgen inject, and fetches only past source=sim rows
+through core's database pool. Public detect returns a core DetectionResult;
+the runner validates provenance, quantiles and horizons and compares forecast
+row counts. Exit is a sanitized JSON/Markdown report with measured timing and
+an explicit pass or failure. No migrations or live-router operations occur.
+
+The merged CHR template CI path generates a masked job-only router password,
+calls `infra/chr/chr.py start` to provision the canonical three-NIC baseline,
+then runs `infra/chr/test_templates.py` for actual apply/export/rollback checks.
+It retains the QEMU log and structured test report and always calls canonical
+stop. The old one-NIC bootstrap remains a separate missing-harness boot smoke.
+
+## Current merged runtime connections
+
+| Entry | Connected operation | Exit / error |
+| --- | --- | --- |
+| `eval/api_demo.py --awaiting` | Actual FastAPI app with saved DemoStore, `_env_file=None`; optionally marks one valid saved plan awaiting review | Loopback HTTP/SSE for browser acceptance; no DB, Temporal, model or router calls |
+| `npm run api:types` | `OPENAPI_URL` -> merged API `/openapi.json` | Generated `lib/generated/openapi.d.ts`; explicit UI adapters consume these schemas |
+| Dashboard load / 30-second refresh / named SSE event or reconnect | `GET /sites`, `/incidents`, `/metrics?site_id=...&series=...&from=...&to=...` | Actual dynamic site health, incident summaries and timestamp-joined actual/forecast points; missing fields remain unavailable |
+| Dashboard mode check | `GET /health` -> `demo_mode` | Saved replay label, confirmed live label or unknown mode; scenario actions require confirmed non-replay health |
+| Incident detail | `GET /incidents/{id}` -> nested incident/report, fix_plan and timeline | Actual evidence, EN/UR customer text, CHR commands, dry-run status and authoritative incident state |
+| Approve / reject awaiting incident | `POST /incidents/{id}/approve` or `/reject`, then authoritative GET; SSE refreshes later changes | 202 acknowledgement is not assumed resolution; errors stay visible |
+| Live scenario action | Confirm `/health`, then `POST /demo/scenarios` using dynamic site ID | Actual ScenarioLabel acknowledgement, then workflow/incident updates; saved replay blocks injection |
+| `simgen.inject("sim-tower", ...)` | Advisory-locked transaction; preserve existing Site, deduplicate backfill, replace only bounded prior simulated recovery, write core probe/interface/subscriber metrics plus label | Atomic normal history + incident + scripted recovery; overlap/topology errors abort |
+| `netcortex-detector-worker --artifact PATH` | `configure_detector` in thread -> lazy `netcortex_worker.main.run()` in same process | Real model ready before Temporal monitoring; setup failure exits nonzero with type-only error |
+| Public `detect(site_id, window, history)` | Actual TabPFN: bounded metric forecast workers, past-only exceedance checks, cause and normal-density anomaly inference | Valid core DetectionResult in memory; worker persists forecasts |
+| `eval/runtime_canary.py` | Full in-memory sim-tower observations -> actual configured TabPFN -> core result validation and timing | Ignored sanitized report; latency gate separate from model accuracy; no DB or router writes |
+
+The previous draft HTTP description above is historical. Generated schemas and
+the merged API own the current contract. Settings editing remains a local UI
+preference; no unsupported backend settings endpoint is invented.

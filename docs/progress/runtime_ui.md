@@ -1,0 +1,11 @@
+# Runtime UI integration progress
+
+The web dashboard now consumes the merged FastAPI OpenAPI contract through generated `apps/web/lib/generated/openapi.d.ts` declarations and adapters in `apps/web/lib/transport.ts`. Live sites preserve `unknown` health and nullable telemetry; location, subscriber counts and other absent metadata display as unavailable. Incident list summaries use the API's snake-case fields, while details map nested incident/report/fix-plan/timeline data, customer messages in English and Urdu, and actual command strings. Metric observations and forecast bands join on timestamp and sort chronologically.
+
+In live-configured mode the UI reads `/health` to label saved API replay separately from operational mode. Replay scenario injection is disabled. Approve/reject POSTs are followed by authoritative incident GETs, and only `awaiting_approval` incidents can be rejected. Dashboard metrics refresh every 30 seconds; named SSE events and reconnects refresh data, with duplicate event IDs ignored and timers/listeners cleaned up. Live POST requests use a finite 30-second timeout and are not retried; ordinary API requests use seven seconds.
+
+Existing local fixtures retain their no-backup advice-only behavior, rollback commands and simulated outcome behavior. The dedicated API browser suite remains lead-owned; coordinate browser/build runs with the lead because Next's dev server uses shared ports and build artifacts.
+
+Validation completed: `npm run typecheck` and `npm run lint` pass cleanly. The lead's actual API replay browser acceptance suite passed 2/2; the production build was validated by the lead.
+
+The lead's runtime review found that the snapshot uses `role` and `iface` for uplinks; the site adapter now selects primary and backup links by role and the dashboard shows both. Live-site workspace labels and incident navigation counts no longer display fixture placeholders. Unknown `/health` mode leaves simulator injection and live approval disabled. Browser coverage checks nullable telemetry and confidence, unknown health, primary/backup mapping, failed health and injection responses, and the 30-second metric refresh. The mock browser suite passed 16/16 and the live suite passed 7/7.

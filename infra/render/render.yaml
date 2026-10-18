@@ -1,0 +1,31 @@
+# Hosted replay demo. Both services are stateless; the API reads its committed snapshot.
+services:
+  - type: web
+    name: netcortex-api
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --package netcortex-api --locked --no-dev
+    startCommand: uv run --package netcortex-api uvicorn netcortex_api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DEMO_MODE
+        value: "true"
+      - key: API_CORS_ORIGINS
+        value: '["https://netcortex-demo.onrender.com"]'
+  - type: web
+    name: netcortex-demo
+    runtime: node
+    plan: free
+    rootDir: apps/web
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_MODE
+        value: live
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://netcortex-api.onrender.com
