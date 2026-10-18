@@ -20,18 +20,21 @@ KEY_SERIES = [
     "iface:ether1:util_pct",
     "subscriber:10.0.0.42:rx_bps",
 ]
-FINISHED = {"resolved", "rolled_back", "rejected"}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--site", default="sim-tower")
     parser.add_argument("--limit", type=int, default=6, help="newest finished incidents to keep")
+    parser.add_argument(
+        "--statuses", default="resolved,rolled_back", help="final statuses worth showing"
+    )
     args = parser.parse_args()
     store = LiveStore()
 
     summaries = [i for i in store.incidents(None) if i.site_id == args.site]
-    finished = [i for i in summaries if i.status.value in FINISHED and i.template_id][: args.limit]
+    wanted = set(args.statuses.split(","))
+    finished = [i for i in summaries if i.status.value in wanted and i.template_id][: args.limit]
     details = [store.incident(i.id) for i in finished]
     if not details:
         print(f"No finished incidents for {args.site}; nothing saved")
