@@ -1,0 +1,38 @@
+<task-notification>
+<task-id>bumk3kz8k</task-id>
+<tool-use-id>toolu_01F8rPwtHEihFt32vbwX7Suf</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bumk3kz8k.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the Temporal worker" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bh465bth3</task-id>
+<tool-use-id>toolu_01E2pFyfajzCisaSvQjbzv72</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bh465bth3.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the FastAPI server" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<pasted_content id="5505">
+a/module-gating is merged. Branch a/demo-hardening from main:
+
+1. packages/fixes safety: if apply fails partway, roll back only what this fix created;
+   never remove or change config that existed before. Record the failure reason.
+   Add a test with a pre-existing object of the same name.
+2. Repeatable runs: give every object a template creates a unique name per incident
+   (e.g. nc-<first 8 chars of incident id>), and make rollback target only those names.
+   Then running heavy_user twice in a row works without resetting CHR.
+3. Agent reliability: set a low temperature for Gemma (e.g. 0.2). Call investigate()
+   directly 11 times (5 heavy_user, 3 uplink_down, 3 dns_slow, the same inputs as the
+   e2e runs) and report how many produced a valid report with the right template. If
+   more than 1 in 11 fails validation, add one short worked example to the instructions
+   and measure again.
+4. Reset CHR once, then run heavy_user end to end twice in a row without a reset.
+   Both should resolve.
+Push and give me the compare URL. Keep the worker and API running on the new code.
+</pasted_content id="5505">
