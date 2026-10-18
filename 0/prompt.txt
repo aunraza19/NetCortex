@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>bbld13md1</task-id>
+<tool-use-id>toolu_01RPxHgSM6JBCwFNygBb7YeJ</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bbld13md1.output</output-file>
+<status>completed</status>
+<summary>Background command "Reset CHR, run official heavy_user e2e" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bpd86em1t</task-id>
+<tool-use-id>toolu_011699KomYiCKBYpNM46JMN5</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bpd86em1t.output</output-file>
+<status>completed</status>
+<summary>Background command "E2E runs: uplink_down then dns_slow" completed (exit code 0)</summary>
+</task-notification>
