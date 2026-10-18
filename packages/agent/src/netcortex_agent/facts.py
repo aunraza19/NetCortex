@@ -2,12 +2,23 @@
 the model. Kept free of model code so they're easy to test.
 """
 
+from __future__ import annotations
+
 import ipaddress
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from netcortex_core import DetectionResult, MetricsWindow, Site, parse_series_key
+from netcortex_core import (
+    IFACE_COLUMNS,
+    PROBE_COLUMNS,
+    SUBSCRIBER_COLUMNS,
+    DetectionResult,
+    MetricsWindow,
+    Site,
+    parse_series_key,
+)
+from pydantic import BaseModel
 
 # Which frame and name column each series kind reads, and its metrics.
 _SERIES = {
@@ -16,6 +27,55 @@ _SERIES = {
     "subscriber": ("subscriber_metrics", "ip", ("rx_bps", "tx_bps")),
 }
 MAX_POINTS = 10
+_NUMERIC = {
+    "probe_metrics": ["rtt_ms", "jitter_ms", "loss_pct"],
+    "iface_metrics": ["rx_bps", "tx_bps", "util_pct", "drops", "errors"],
+    "subscriber_metrics": ["rx_bps", "tx_bps"],
+}
+_COLUMNS = {
+    "probe_metrics": PROBE_COLUMNS,
+    "iface_metrics": IFACE_COLUMNS,
+    "subscriber_metrics": SUBSCRIBER_COLUMNS,
+}
+
+
+class WindowData(BaseModel):
+    """A MetricsWindow as plain records at 1-minute resolution: small enough to pass
+    between Temporal activities, and plenty for the model."""
+
+    as_of: datetime
+    probe_metrics: list[dict[str, Any]] = []
+    iface_metrics: list[dict[str, Any]] = []
+    subscriber_metrics: list[dict[str, Any]] = []
+
+    @classmethod
+    def from_window(cls, window: MetricsWindow, freq: str = "1min") -> WindowData:
+        records = {}
+        for frame_name, (_, name_col, _) in ((v[0], v) for v in _SERIES.values()):
+            frame = getattr(window, frame_name)
+            if frame.empty:
+                records[frame_name] = []
+                continue
+            frame = frame.assign(time=pd.to_datetime(frame["time"], utc=True).dt.floor(freq))
+            keys = ["time", name_col, *(c for c in ("site_id", "kind", "source") if c in frame)]
+            numeric = frame[_NUMERIC[frame_name]].apply(pd.to_numeric, errors="coerce")
+            grouped = pd.concat([frame[keys], numeric], axis=1).groupby(keys, dropna=False)
+            means = grouped.mean().reset_index()
+            means["time"] = means["time"].map(lambda t: t.isoformat())
+            records[frame_name] = [
+                {k: (None if isinstance(v, float) and v != v else v) for k, v in row.items()}
+                for row in means.to_dict("records")
+            ]
+        return cls(as_of=window.as_of, **records)
+
+    def to_window(self) -> MetricsWindow:
+        frames = {}
+        for frame_name, columns in _COLUMNS.items():
+            frame = pd.DataFrame(getattr(self, frame_name), columns=list(columns))
+            if not frame.empty:
+                frame["time"] = pd.to_datetime(frame["time"], utc=True)
+            frames[frame_name] = frame
+        return MetricsWindow(as_of=self.as_of, **frames)
 
 
 def available_series(window: MetricsWindow) -> dict[str, list[str]]:
