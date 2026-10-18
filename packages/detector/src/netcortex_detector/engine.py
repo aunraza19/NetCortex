@@ -9,28 +9,21 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 from netcortex_core import (
+    IFACE_COLUMNS,
+    PROBE_COLUMNS,
     Cause,
     DetectionResult,
     ForecastPoint,
     MetricsWindow,
     ModuleUnavailable,
     SeriesForecast,
-    Settings,
+    get_settings,
     series_key,
 )
 
-CAUSES = (
-    "uplink_congestion",
-    "heavy_user",
-    "upstream_degradation",
-    "game_route_issue",
-    "wireless_interference",
-    "uplink_down",
-    "dns_slow",
-    "normal",
-)
-PROBE_COLUMNS = {"time", "site_id", "target", "rtt_ms", "jitter_ms", "loss_pct"}
-IFACE_COLUMNS = {"time", "site_id", "iface", "util_pct", "drops", "errors"}
+CAUSES = tuple(Cause)
+_PROBE_REQUIRED_COLUMNS = set(PROBE_COLUMNS) - {"kind", "source"}
+_IFACE_REQUIRED_COLUMNS = set(IFACE_COLUMNS) - {"rx_bps", "tx_bps", "source"}
 
 
 class DetectorUnavailable(ModuleUnavailable):
@@ -67,7 +60,7 @@ def _utc_series(values: pd.Series, name: str) -> pd.Series:
 def _validate_frame(
     frame: pd.DataFrame, required: set[str], name: str, site_id: str
 ) -> pd.DataFrame:
-    missing = required - set(frame.columns)
+    missing = set(required) - set(frame.columns)
     if missing:
         raise ValueError(f"{name} missing required columns: {', '.join(sorted(missing))}")
     result = frame.copy()
@@ -91,8 +84,8 @@ def build_features(
     source_roles: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Build UTC minute snapshots from observations at or before as_of only."""
-    p = _validate_frame(probes, PROBE_COLUMNS, "probe", site_id)
-    i = _validate_frame(interfaces, IFACE_COLUMNS, "interface", site_id)
+    p = _validate_frame(probes, _PROBE_REQUIRED_COLUMNS, "probe", site_id)
+    i = _validate_frame(interfaces, _IFACE_REQUIRED_COLUMNS, "interface", site_id)
     _validate_source_consistency(p, i)
     _validate_bounds(
         p, {"rtt_ms": (0, None), "jitter_ms": (0, None), "loss_pct": (0, 100)}, "probe"
@@ -279,9 +272,7 @@ def run_engine(
         else:
             forecasts = backend.forecasts(inference_features, 5)
             sustained = _walk_forward_exceedances(inference_features, backend, cfg)
-            cause, confidence = _infer_cause(
-                backend, vector, training_features, training_labels
-            )
+            cause, confidence = _infer_cause(backend, vector, training_features, training_labels)
             raw_anomaly = float(backend.anomaly(vector))
         _validate_forecast_rows(forecasts)
         if not np.isfinite(confidence) or not np.isfinite(raw_anomaly):
@@ -354,9 +345,7 @@ def _parallel_inference(
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             "forecasts": executor.submit(backend.forecasts, features, 5),
-            "sustained": executor.submit(
-                _walk_forward_exceedances, features, backend, config
-            ),
+            "sustained": executor.submit(_walk_forward_exceedances, features, backend, config),
             "cause": executor.submit(
                 _infer_cause, backend, vector, training_features, training_labels
             ),
@@ -526,16 +515,17 @@ def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> Detec
         raise DetectorUnavailable("detect requires core MetricsWindow inputs")
     if window.probe_metrics.empty or window.iface_metrics.empty:
         raise DetectorUnavailable("probe and interface observations are required")
-    if not window.probe_metrics["site_id"].eq(site_id).all() or not window.iface_metrics[
-        "site_id"
-    ].eq(site_id).all():
+    if (
+        not window.probe_metrics["site_id"].eq(site_id).all()
+        or not window.iface_metrics["site_id"].eq(site_id).all()
+    ):
         raise DetectorUnavailable("metrics window contains rows for a different site")
 
     # Prior history is context only. It supplies observations, never labels or expected causes.
     probes = _combine_observations(history.probe_metrics, window.probe_metrics)
     interfaces = _combine_observations(history.iface_metrics, window.iface_metrics)
     target_roles = _identity_target_roles(probes)
-    settings = Settings()
+    settings = get_settings()
     from netcortex_detector import providers
     from netcortex_detector.preparation import get_prepared_detector
 

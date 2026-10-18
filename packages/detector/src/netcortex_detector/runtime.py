@@ -33,8 +33,6 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     except Exception as exc:
-        logging.getLogger(__name__).error(
-            "detector worker failed (%s)", type(exc).__name__
-        )
+        logging.getLogger(__name__).error("detector worker failed (%s)", type(exc).__name__)
         return 1
     return 0

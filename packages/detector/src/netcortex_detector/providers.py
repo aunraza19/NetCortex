@@ -400,9 +400,7 @@ class TabPFNBackend:
                 for key, group in groups.items()
             }
             try:
-                for future in as_completed(
-                    futures, timeout=FORECAST_INFERENCE_BUDGET_SECONDS
-                ):
+                for future in as_completed(futures, timeout=FORECAST_INFERENCE_BUDGET_SECONDS):
                     future.result()
             except TimeoutError as exc:
                 for future in futures:
@@ -548,9 +546,7 @@ class TabPFNBackend:
                 {
                     "metric": metric,
                     "made_at": origin.isoformat(),
-                    "target_time": (
-                        origin.floor("min") + pd.Timedelta(minutes=offset)
-                    ).isoformat(),
+                    "target_time": (origin.floor("min") + pd.Timedelta(minutes=offset)).isoformat(),
                     "horizon_minutes": offset,
                     "p10": lo,
                     "p50": mid,
@@ -587,9 +583,7 @@ class TabPFNBackend:
                 "tabpfn_extensions.unsupervised", fromlist=["TabPFNUnsupervisedModel"]
             )
             self._unsupervised = module.TabPFNUnsupervisedModel(tabpfn_clf=clf, tabpfn_reg=reg)
-            self._unsupervised_module = sys.modules.get(
-                module.TabPFNUnsupervisedModel.__module__
-            )
+            self._unsupervised_module = sys.modules.get(module.TabPFNUnsupervisedModel.__module__)
             self._unsupervised.fit(_array(data))
             self._anomaly_columns = columns
         except Exception as exc:
@@ -624,9 +618,7 @@ class TabPFNBackend:
                     self._unsupervised_module, "random"
                 ):
                     previous_random = self._unsupervised_module.random
-                    self._unsupervised_module.random = random.Random(
-                        ANOMALY_PERMUTATION_SEED
-                    )
+                    self._unsupervised_module.random = random.Random(ANOMALY_PERMUTATION_SEED)
                     try:
                         result = self._unsupervised.outliers(data, n_permutations=1)
                     finally:
@@ -638,9 +630,7 @@ class TabPFNBackend:
                 dtype=float,
             ).reshape(-1)
             if len(scores) != len(vectors) or not np.isfinite(scores).all():
-                raise DetectorUnavailable(
-                    "TabPFN anomaly scoring returned invalid batch results"
-                )
+                raise DetectorUnavailable("TabPFN anomaly scoring returned invalid batch results")
             return scores.tolist()
         except DetectorUnavailable:
             raise

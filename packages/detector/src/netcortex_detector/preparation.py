@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from netcortex_core import ModuleUnavailable, Settings
+from netcortex_core import ModuleUnavailable, Settings, get_settings
 
 from netcortex_detector.engine import (
     CAUSES,
@@ -62,9 +62,7 @@ def prepare_detector(cases_dir: Path, out: Path) -> Path:
     if len(set(train_labels)) < 2:
         raise ModuleUnavailable("TRAIN cases must contain at least two cause classes")
 
-    _, validation_rows, validation_labels = _feature_rows(
-        validation_cases, columns=train_columns
-    )
+    _, validation_rows, validation_labels = _feature_rows(validation_cases, columns=train_columns)
     normal_validation = [
         row
         for row, label in zip(validation_rows, validation_labels, strict=True)
@@ -126,7 +124,7 @@ def configure_detector(
             f"detector training artifact is invalid ({type(exc).__name__})"
         ) from exc
 
-    configured = settings or Settings()
+    configured = settings or get_settings()
     mode = configured.tabpfn_mode
     token = configured.tabpfn_token.get_secret_value() if configured.tabpfn_token else None
     configuration_digest = hashlib.sha256(
@@ -155,9 +153,7 @@ def configure_detector(
 
         backend_factory = TabPFNBackend
     try:
-        backend = backend_factory(
-            mode, access_token=token, timeout_s=configured.http_timeout_s
-        )
+        backend = backend_factory(mode, access_token=token, timeout_s=configured.http_timeout_s)
         if str(getattr(backend, "provenance", "")).startswith("fixture:"):
             raise ModuleUnavailable("startup preparation requires a real provider backend")
         train_frame = pd.DataFrame(train, columns=columns)

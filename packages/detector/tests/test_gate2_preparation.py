@@ -133,7 +133,7 @@ def test_prepared_backend_is_used_by_public_detect(training_cases, tmp_path, mon
     backend = Backend()
     settings = Settings(_env_file=None, tabpfn_mode="cloud")
     artifact = prepare_detector(training_cases, tmp_path / "training.json")
-    monkeypatch.setattr(engine, "Settings", lambda: settings)
+    monkeypatch.setattr(engine, "get_settings", lambda: settings)
     try:
         configure_detector(artifact, settings=settings, backend_factory=lambda *a, **k: backend)
         folder = training_cases / "validation"

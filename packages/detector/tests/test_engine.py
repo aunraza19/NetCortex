@@ -240,7 +240,7 @@ def test_public_detect_requires_real_startup_setup_before_provider_calls(monkeyp
         def forecasts(self, history, horizon):
             pytest.fail("detect must reject an unprepared backend before provider calls")
 
-    monkeypatch.setattr(engine, "Settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(engine, "get_settings", lambda: Settings(_env_file=None))
     monkeypatch.setattr(providers, "TabPFNBackend", lambda *args, **kwargs: UnpreparedRealBackend())
     clear_prepared_detector()
     try:
