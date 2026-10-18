@@ -34,18 +34,17 @@ Base installation excludes the optional model dependencies and needs no API keys
 | Simulator and RIPE data | [simgen](../packages/simgen/README.md) | [decision](../packages/simgen/decision.md), [flow](../packages/simgen/flow.md) |
 | Detection and forecasts | [detector](../packages/detector/README.md) | [decision](../packages/detector/decision.md), [flow](../packages/detector/flow.md) |
 | RouterOS retrieval | [runbook](../packages/runbook/README.md) | [decision](../packages/runbook/decision.md), [flow](../packages/runbook/flow.md) |
-| Voice and outage news | [notify](../packages/notify/README.md) | [decision](../packages/notify/decision.md), [flow](../packages/notify/flow.md) |
+| Outage news | [notify](../packages/notify/README.md) | [decision](../packages/notify/decision.md), [flow](../packages/notify/flow.md) |
 | Dashboard | [web](../apps/web/README.md) | [decision](../apps/web/decision.md), [flow](../apps/web/flow.md) |
 | CI and CHR | [admin setup](../.github/admin-setup.md) | [decision](../.github/decision.md), [flow](../.github/flow.md) |
 | Hosting | [Render](../infra/render/README.md) | [decision](../infra/render/decision.md), [flow](../infra/render/flow.md) |
 
 ## Switching to the shared runtime
 
-[Contract requests](CONTRACT_REQUESTS.md) describe the exact missing shared
-schemas, configuration and endpoints. [Setup](SETUP.md) explains credentials,
-model/database setup and deployment. Public Python wrappers deliberately refuse
-to construct invented shared objects while `netcortex_core` is absent. Internal
-engines accept ordinary data/configuration for independent testing.
+[Contract answers](CONTRACT_REQUESTS.md) summarize Aun's merged schemas,
+configuration and runtime agreements. [Setup](SETUP.md) explains credentials,
+model/database setup and deployment. Public Python wrappers now bind to actual `netcortex_core` objects. Internal
+engines also accept ordinary data/configuration for independent testing.
 
 For live UI mode, use the documented environment variables and generate API types
 from Aun's actual OpenAPI. Live errors remain visible. A successful mocked API

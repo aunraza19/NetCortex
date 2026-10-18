@@ -26,7 +26,7 @@ jobs:
         run: uv run --locked ruff check . .github/scripts .github/tests
       - name: Pytest
         run: |
-          uv run --locked pytest packages .github/tests \
+          uv run --locked pytest -m "not live" \
             --cov --cov-report=term-missing
 
   web:

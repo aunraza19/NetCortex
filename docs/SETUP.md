@@ -28,7 +28,7 @@ Playwright browser setup may also require `npx playwright install --with-deps` o
 
 ## Local environment and secrets
 
-Copy `.env.example` to `.env` when the relevant integration modules provide it. Keep `.env` local; never add credentials to source control. Use mock/offline modes for unit tests. External credentials such as database, Sentry, TabPFN, ElevenLabs, and SerpApi keys are optional and should be supplied only for the corresponding integration. No credentials are required for linting or offline unit tests.
+Copy `.env.example` to `.env` when the relevant integration modules provide it. Keep `.env` local; never add credentials to source control. Use mock/offline modes for unit tests. External credentials such as database, Sentry, TabPFN, and SerpApi keys are optional and should be supplied only for the corresponding integration. No credentials are required for linting or offline unit tests.
 
 Store secrets in the local shell environment or the hosting provider's encrypted environment settings. Do not place production secrets in frontend variables: values embedded into a browser bundle are public.
 
@@ -42,7 +42,7 @@ The hosted demo may use Render, Tiger Data, Sentry, and vendor trial/free credit
 
 ## Integration gates
 
-The core package name and shared schemas, Settings, API and SSE contract, role mapping, and CHR harness are awaiting Aun's confirmation. See [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md). The Render blueprint describes the Next.js Node web service; an API service must not be added until Aun's backend exists and its deployment contract is known.
+Core schemas, Settings, DNS/subscriber observations and runtime agreements are merged. API/OpenAPI and the actual CHR harness still require their runtime implementation. See [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md). The Render blueprint describes the Next.js Node web service; an API service must not be added until Aun's backend exists and its deployment contract is known.
 
 ## Agent add-ons configured on this workstation
 

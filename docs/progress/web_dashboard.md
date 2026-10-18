@@ -17,7 +17,7 @@ Visual review screenshots (ignored by Git):
 - `C:\Users\nigga\Documents\NetCortex-web\apps\web\test-results\overview-desktop.png`
 - `C:\Users\nigga\Documents\NetCortex-web\apps\web\test-results\overview-mobile.png`
 
-Integration still requires Aun's published OpenAPI schema and backend contract review, especially payload field mappings, metrics series semantics, SSE replay/heartbeat behavior, and voice media response. No API schema was available, so generated API types were not produced. Sentry is initialized only when a DSN is supplied; no DSN or Sentry MCP connection was available, so delivery is not verified. The root CI and Render service configuration remain parent-owned.
+Integration still requires Aun's published OpenAPI schema and backend contract review, especially payload field mappings, metrics series semantics, SSE replay/heartbeat behavior. No API schema was available, so generated API types were not produced. Sentry is initialized only when a DSN is supplied; no DSN or Sentry MCP connection was available, so delivery is not verified. The root CI and Render service configuration remain parent-owned.
 
 Final topology correction: `apps/web/lib/fixtures.ts` subscriber counts and primary/backup capacities now match the canonical simulator source `data/sites.yaml` (North Tower 120 / 180 / 80 Mbps; Market Cafe 48 / 100 / no backup; East Relay 165 / 250 / 100 Mbps). Health, utilization, latency and loss remain illustrative replay values. The overview browser case asserts the subscriber and primary-capacity values on desktop and mobile; it passed again alongside lint, typecheck and format checks. Screenshots at the paths above were refreshed. No dashboard test server remained listening on ports 3000 or 3001 after the targeted run.
 
@@ -28,3 +28,5 @@ Final topology correction: `apps/web/lib/fixtures.ts` subscriber counts and prim
 ## Deterministic approval E2E timing
 
 The approve-to-resolved and approve-to-rollback browser tests install Playwright `page.clock` after opening the confirmation dialog, pause it at a fixed future time with `pauseAt`, and explicitly advance through the existing 250/400/500 ms mock transport waits with `runFor`. The clock stays paused between advances, keeping applying/verifying assertions deterministic under CI scheduling while leaving application workflow timing untouched. After this pause refinement, the focused approval/rollback cases passed on desktop and mobile (4/4). The full suites had passed immediately before this refinement: dashboard 14/14, live 3/3; lint, typecheck and format check passed. No app code changed.
+
+Current removal/core update: see [core news/UI handoff](core_news_ui.md). Both browser suites passed, 14 dashboard plus three live-transport cases.

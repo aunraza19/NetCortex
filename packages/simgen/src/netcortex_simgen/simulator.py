@@ -4,14 +4,30 @@ import json
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import yaml
-
-if TYPE_CHECKING:
-    from netcortex_core import Cause, ScenarioLabel
+from netcortex_core import (
+    Cause,
+    IfaceMetric,
+    ModuleUnavailable,
+    ProbeKind,
+    ProbeMetric,
+    ProbeTarget,
+    ScenarioLabel,
+    Site,
+    Source,
+    SubscriberMetric,
+    TargetRole,
+    TemplateId,
+    Uplink,
+    UplinkRole,
+)
+from netcortex_core import db as core_db
+from netcortex_core.settings import Settings
+from psycopg.types.json import Jsonb
 
 
 def _find_workspace_root() -> Path:
@@ -458,6 +474,7 @@ def generate(
                         "time": times,
                         "site_id": site["id"],
                         "target": target,
+                        "kind": "icmp",
                         "rtt_ms": rtt,
                         "jitter_ms": np.maximum(0.1, jitter),
                         "loss_pct": loss,
@@ -465,6 +482,23 @@ def generate(
                     }
                 )
             )
+        dns_ms = np.maximum(5, 24 + rng.normal(0, 2, num_pings))
+        dns_mask = cause_at_ping == "dns_slow"
+        dns_ms[dns_mask] = np.maximum(300, rng.normal(650, 35, int(dns_mask.sum())))
+        pings.append(
+            pd.DataFrame(
+                {
+                    "time": times,
+                    "site_id": site["id"],
+                    "target": "dns:1.1.1.1",
+                    "kind": "dns",
+                    "rtt_ms": dns_ms,
+                    "jitter_ms": np.maximum(0.1, rng.normal(2, 0.4, num_pings)),
+                    "loss_pct": np.zeros(num_pings),
+                    "source": "sim",
+                }
+            )
+        )
     probe_frame = pd.concat(pings, ignore_index=True)
     iface_frame = pd.DataFrame(ifaces)
     probe_frame.attrs["calibration"] = calibration_metadata
@@ -491,7 +525,7 @@ def generate_supplemental(
         raise ValueError("supplemental end must follow start")
     layout = sites()["sites"]
     selected = [s for s in layout if site_ids is None or s["id"] in site_ids]
-    times = pd.date_range(start=start, end=end, freq="30s", inclusive="both", tz="UTC")
+    times = pd.date_range(start=start, end=end, freq="30s", inclusive="left", tz="UTC")
     rows = []
     for site_index, site in enumerate(selected):
         rng = np.random.default_rng(seed + site_index * 997)
@@ -554,48 +588,147 @@ def generate_supplemental(
     return pd.DataFrame(rows)
 
 
+def generate_subscribers(
+    labels: list[dict[str, Any]],
+    *,
+    start: datetime,
+    end: datetime,
+    seed: int = 42,
+    site_ids: list[str] | None = None,
+) -> pd.DataFrame:
+    """Generate continuous, core-shaped subscriber observations."""
+    start, end = _utc(start), _utc(end)
+    if end <= start:
+        raise ValueError("subscriber end must follow start")
+    selected = [s for s in sites()["sites"] if site_ids is None or s["id"] in site_ids]
+    times = pd.date_range(start=start, end=end, freq="30s", inclusive="left", tz="UTC")
+    rows = []
+    for ix, site in enumerate(selected):
+        rng = np.random.default_rng(seed + ix * 997)
+        active = [label for label in labels if label["site_id"] == site["id"]]
+        for stamp in times:
+            instant = stamp.to_pydatetime()
+            heavy = any(
+                x["cause"] == "heavy_user" and x["start"] <= instant < x["end"] for x in active
+            )
+            rx = max(100_000, int((75 if heavy else rng.gamma(2, 900_000) / 1_000_000) * 1_000_000))
+            rows.append(
+                {
+                    "time": instant,
+                    "site_id": site["id"],
+                    "ip": "192.0.2.10",
+                    "rx_bps": rx,
+                    "tx_bps": max(50_000, int(rx * 0.1)),
+                    "source": "sim",
+                }
+            )
+    return pd.DataFrame(rows, columns=list(SubscriberMetric.model_fields))
+
+
+def site_from_fixture(site_id: str) -> Site:
+    """Convert fixture topology to the shared core Site contract."""
+    raw = next((s for s in sites()["sites"] if s["id"] == site_id), None)
+    if raw is None:
+        raise ValueError(f"unknown site: {site_id}")
+    uplinks = [
+        Uplink(
+            iface=x["interface"],
+            role=UplinkRole(x["role"]),
+            capacity_mbps=x["capacity_mbps"],
+            gateway=x.get("gateway"),
+        )
+        for x in raw["uplinks"]
+    ]
+    if raw.get("backup_uplink"):
+        x = raw["backup_uplink"]
+        uplinks.append(
+            Uplink(
+                iface=x["interface"],
+                role=UplinkRole.BACKUP,
+                capacity_mbps=x["capacity_mbps"],
+                gateway=x.get("gateway"),
+            )
+        )
+    uplinks.extend(
+        Uplink(
+            iface=x["interface"],
+            role=UplinkRole.BACKHAUL,
+            capacity_mbps=x["capacity_mbps"],
+            gateway=x.get("gateway"),
+        )
+        for x in raw.get("backhauls", [])
+    )
+    role = {
+        "gateway": TargetRole.GATEWAY,
+        "upstream-hop": TargetRole.UPSTREAM_HOP,
+        "regional-game": TargetRole.GAME_SERVER,
+        "1.1.1.1": TargetRole.PUBLIC_DNS,
+        "8.8.8.8": TargetRole.PUBLIC_DNS,
+    }
+    targets = [ProbeTarget(key=target, host=target, role=role[target]) for target in raw["targets"]]
+    targets.append(
+        ProbeTarget(
+            key="dns:1.1.1.1", host="1.1.1.1", kind=ProbeKind.DNS, role=TargetRole.PUBLIC_DNS
+        )
+    )
+    return Site(
+        id=raw["id"],
+        name=raw["name"],
+        uplinks=uplinks,
+        targets=targets,
+        subscribers=raw["subscribers"],
+    )
+
+
 def _label(
     site: dict[str, Any], cause: str, start: datetime, end: datetime, seed: int
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
+    affected: dict[str, Any] = {}
+    template_id = TEMPLATES[cause]
     if cause == "uplink_congestion":
-        params = {"interface": site["uplinks"][0]["interface"], "priority": "high"}
+        uplink = site["uplinks"][0]
+        params = {
+            "uplink": uplink["interface"],
+            "uplink_mbps": max(1, int(uplink["capacity_mbps"] * 0.9)),
+            "game_ports": "3074,3478-3480,27015-27050",
+        }
+        affected = {"iface": uplink["interface"]}
     if cause == "uplink_down":
-        params = (
-            {
-                "primary": site["uplinks"][0]["interface"],
-                "backup": site["backup_uplink"]["interface"],
+        primary = site["uplinks"][0]
+        backup = site.get("backup_uplink")
+        affected = {
+            "iface": primary["interface"],
+            "backup_iface": backup["interface"] if backup else None,
+        }
+        if primary.get("gateway") and backup and backup.get("gateway"):
+            params = {
+                "primary_gateway": primary["gateway"],
+                "backup_gateway": backup["gateway"],
+                "backup_distance": 2,
             }
-            if site.get("backup_uplink")
-            else {
-                "primary": site["uplinks"][0]["interface"],
-                "backup": None,
-                "actionable": False,
-            }
-        )
+        else:
+            template_id = "none"
     if cause == "heavy_user":
         params = {
-            "limit_mbps": 10,
-            "evidence_status": "synthetic subscriber row is supplemental; "
-            "core subscriber contract pending",
+            "target": "192.0.2.10",
+            "upload_mbps": 1,
+            "download_mbps": 10,
         }
+        affected = {"ip": "192.0.2.10"}
     if cause == "dns_slow":
-        params = {
-            "template": "dns_servers",
-            "evidence_status": "experimental resolution rows are supplemental",
-        }
-    if cause == "wireless_interference":
-        params = {
-            "interface": site["backhauls"][0]["interface"],
-            "evidence_status": "simulated interface counters; role contract pending",
-        }
+        params = {"servers": ["1.1.1.1", "8.8.8.8"]}
+        affected = {"target": "dns:1.1.1.1"}
+    if cause == "wireless_interference" and site.get("backhauls"):
+        affected = {"iface": site["backhauls"][0]["interface"]}
     return {
         "site_id": site["id"],
         "start": start,
         "end": end,
         "cause": cause,
-        "template_id": TEMPLATES[cause],
+        "template_id": template_id,
         "params": params,
+        "affected": affected,
         "seed": seed,
         "split": "generated",
     }
@@ -621,21 +754,94 @@ def inject_frames(
 
 
 def inject(
-    site_id: str, scenario_type: Cause, duration_min: int, seed: int | None = None
+    site_id: str,
+    scenario_type: Cause,
+    duration_min: int,
+    seed: int | None = None,
+    *,
+    now: datetime | None = None,
+    database: Any = None,
 ) -> ScenarioLabel:
-    """Core-facing contract entry point; unavailable until the real core arrives."""
-    try:
-        import importlib
-
-        core = importlib.import_module("netcortex_core")
-        for symbol in ("Cause", "ScenarioLabel"):
-            getattr(core, symbol)
-    except (ImportError, AttributeError) as exc:
-        raise RuntimeError(
-            "Core injection unavailable: netcortex_core and its approved "
-            "ScenarioLabel contract are not present"
-        ) from exc
-    raise RuntimeError(
-        "Core injection adapter is unbound: confirm core injection lifecycle, "
-        "Cause values, and ScenarioLabel construction before enabling"
+    """Atomically inject core-validated sim observations for a bounded window."""
+    if not 1 <= duration_min <= 22 * 60:
+        raise ValueError("duration_min must be between 1 and 1320 (22 hours)")
+    cause = Cause(scenario_type)
+    now = _utc(now or datetime.now(UTC))
+    end = now + timedelta(minutes=duration_min)
+    actual_seed = int(seed if seed is not None else np.random.SeedSequence().generate_state(1)[0])
+    fixture_site = next((site for site in sites()["sites"] if site["id"] == site_id), None)
+    if fixture_site is None:
+        raise ValueError(f"unknown site: {site_id}")
+    setting = None
+    if database is None:
+        setting = Settings()
+        if setting.database_url is None:
+            raise ModuleUnavailable("DATABASE_URL is required for simulator injection")
+    scenario_raw = _label(fixture_site, cause.value, now, end, actual_seed)
+    label = ScenarioLabel(
+        site_id=site_id,
+        scenario_type=cause,
+        start_at=now,
+        end_at=end,
+        affected=scenario_raw["affected"],
+        expected_cause=cause,
+        expected_template=TemplateId(scenario_raw["template_id"]),
+        expected_params=scenario_raw["params"],
+        seed=actual_seed,
+        source=Source.SIM,
     )
+    fixture_start = now - timedelta(hours=2)
+    p, i, labels = generate(
+        days=1,
+        start=fixture_start,
+        scenario_type=cause.value,
+        duration_min=duration_min,
+        site_id=site_id,
+        seed=actual_seed,
+    )
+    p = p[(p.time >= now) & (p.time < end)]
+    i = i[(i.time >= now) & (i.time < end)]
+    subscriber = generate_subscribers(
+        labels, start=now, end=end, seed=actual_seed, site_ids=[site_id]
+    )
+    probes = [ProbeMetric.model_validate(row) for row in p.to_dict("records")]
+    ifaces = [IfaceMetric.model_validate(row) for row in i.to_dict("records")]
+    subscribers = [SubscriberMetric.model_validate(row) for row in subscriber.to_dict("records")]
+    # Label is written through the same transaction as observations. The advisory
+    # lock serializes concurrent injectors for this site before overlap checking.
+    pool = database if database is not None else core_db.get_pool(setting)
+    with pool.connection() as conn, conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (site_id,))
+            cur.execute(
+                "SELECT 1 FROM scenario_labels WHERE site_id=%s AND source='sim' "
+                "AND start_at < %s AND COALESCE(end_at, 'infinity') > %s LIMIT 1",
+                (site_id, end, now),
+            )
+            if cur.fetchone():
+                raise ValueError("an injected scenario overlaps this site and time window")
+        if core_db.fetch_site(conn, site_id) is None:
+            core_db.upsert_site(conn, site_from_fixture(site_id))
+        core_db.insert_probe_metrics(conn, probes)
+        core_db.insert_iface_metrics(conn, ifaces)
+        core_db.insert_subscriber_metrics(conn, subscribers)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO scenario_labels (id, site_id, scenario_type, start_at, end_at, "
+                "affected, expected_cause, expected_template, expected_params, seed, source) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    label.id,
+                    label.site_id,
+                    label.scenario_type.value,
+                    label.start_at,
+                    label.end_at,
+                    Jsonb(label.affected),
+                    label.expected_cause.value,
+                    label.expected_template.value,
+                    Jsonb(label.expected_params),
+                    label.seed,
+                    label.source.value,
+                ),
+            )
+    return label

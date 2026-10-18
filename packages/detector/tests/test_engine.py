@@ -212,8 +212,8 @@ def test_context_truncated_to_configured_limit():
     assert backend.seen <= 7
 
 
-def test_public_core_adapter_fails_clearly_when_core_missing():
-    with pytest.raises(DetectorUnavailable, match="netcortex_core"):
+def test_public_core_adapter_rejects_non_core_windows():
+    with pytest.raises(DetectorUnavailable, match="MetricsWindow"):
         detect("s1", object(), object())
 
 

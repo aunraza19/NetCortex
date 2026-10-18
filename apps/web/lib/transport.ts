@@ -15,7 +15,6 @@ export interface Transport {
   incidents(status?: string, siteId?: string): Promise<Incident[]>;
   incident(id: string): Promise<Incident>;
   metrics(siteId: string): Promise<ReturnType<typeof makeSeries>>;
-  voice(id: string): Promise<string>;
   inject(
     siteId: string,
     scenario: Scenario,
@@ -257,32 +256,6 @@ export const transport: Transport = {
     return mode === "live"
       ? request(`/metrics?${query}`)
       : (await pause(), makeSeries());
-  },
-  async voice(id) {
-    if (mode === "mock")
-      throw new Error(
-        "Voice alert unavailable in replay fixtures. No audio has been generated.",
-      );
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
-    try {
-      const response = await fetch(
-        `${base}/incidents/${encodeURIComponent(id)}/voice`,
-        { signal: controller.signal },
-      );
-      if (!response.ok)
-        throw new Error(
-          response.status === 404
-            ? "No voice alert is available for this incident."
-            : `Voice alert request failed (${response.status}).`,
-        );
-      return URL.createObjectURL(await response.blob());
-    } catch (error) {
-      if (error instanceof Error) throw error;
-      throw new Error("Voice alert could not be reached.");
-    } finally {
-      clearTimeout(timer);
-    }
   },
   async inject(siteId, scenario, duration) {
     if (mode === "live") {

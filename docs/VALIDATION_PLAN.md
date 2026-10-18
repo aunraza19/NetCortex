@@ -32,10 +32,10 @@ Heavy-user fix parameters must come from observed subscriber telemetry, not labe
   incidents, seeds and time windows. Freeze thresholds on validation, not tests.
 - Retrieval: correct top-three result for four fix topics; repeat-safe indexing;
   dimension/model mismatch; missing database/model; official source attribution.
-- Notifications: MP3 in English/Urdu, missing keys, timeout/rate limit, malformed
-  search results and unavailable checks distinct from confirmed no outage.
+- News: missing keys, timeout/rate limit, malformed search results and unavailable
+  checks distinct from confirmed no outage.
 - UI: mobile layout; loading/empty/error states; approval/rejection confirmation;
-  duplicate clicks; failed CHR check; request errors; unavailable voice;
+  duplicate clicks; failed CHR check; request errors; preserved English/Urdu customer text;
   reconnect/refetch and duplicate SSE events; live mode must not fall back to mocks.
 - Integration: inject -> detect -> investigate -> CHR check -> approve/reject ->
   resolved/rolled_back. Verify workflow rejection and expiry with Aun.

@@ -1,5 +1,5 @@
-"""Voice and upstream-news helpers."""
+"""Upstream-news checks."""
 
-from .service import check_news, speak
+from .service import check_news
 
-__all__ = ["check_news", "speak"]
+__all__ = ["check_news"]

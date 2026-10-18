@@ -1,3 +1,6 @@
+> Updated scope: core/agent and removal PRs are merged. The shared code and
+> [contract answers](CONTRACT_REQUESTS.md) supersede the original draft below.
+
 # NetCortex — Partner Build Plan
 
 Oct 18, 2026 · @Aun Raza
@@ -35,7 +38,6 @@ We are entering the DEV **Hacktoberfest Open-Source AI Challenge, Week 2: "Side 
 | Temporal | $100 | Durable monitoring and incident workflows | Aun |
 | Sentry | $100 | Traces every agent and model step | Aun (backend), Partner (UI) |
 | Tiger Data | $100 | Metrics storage (TimescaleDB) and docs search (pgvector) | Shared database, Aun sets it up |
-| ElevenLabs | $100 | Voice alert for the owner, Urdu or English | Partner |
 | SerpApi | $100 | "Is it us or them?" outage check | Partner |
 | .tech domain | $100 | The demo's public address | Partner |
 | GitHub | $100 | CI that tests every fix on a virtual router, Copilot PR review | Partner |
@@ -56,7 +58,7 @@ NetCortex watches a small network, warns before customers start complaining, exp
 3. Investigates: is the uplink full, is one user hogging it, is the upstream ISP having a bad day, or is one game server's route broken?
 4. Proposes one fix from a set of tested MikroTik RouterOS templates, with the exact commands and the commands to undo them.
 5. Tests that fix on a virtual MikroTik router before any human sees it.
-6. Alerts the owner (dashboard, plus a short voice note in Urdu or English) and waits for Approve or Reject.
+6. Alerts the owner (dashboard and English/Urdu customer text) and waits for Approve or Reject.
 7. After an approved fix, watches the metrics and rolls back automatically if things did not improve.
 
 **Why open models matter here** (this is a required part of the post):
@@ -66,7 +68,6 @@ NetCortex watches a small network, warns before customers start complaining, exp
 - **Cost:** no per-token bills, so a small ISP can afford it.
 - **Control:** we can swap models, fine-tune for RouterOS, and constrain the agent's output.
 
-**Honest limits to state in the post:** TabPFN-3.5's cloud API sends anonymised metrics out, and its free license is non-commercial (a paid product would need a commercial license). Cloud add-ons (ElevenLabs, SerpApi, TabPFN cloud) are optional switches. The hosted demo uses replayed and simulated data.
 
 **Vendor scope:** MikroTik RouterOS only. It is common among small ISPs and has a free virtual router image (CHR) we can test on. Cisco is out of scope.
 
@@ -85,7 +86,6 @@ The highlighted boxes are the partner's. Every partner box is a plain function o
 3. **Open.** If `is_anomaly` is true and no incident is open for that site and cause, an `incidents` row is created and `IncidentWorkflow` starts.
 4. **Investigate.** Aun's agent runs `investigate()`. It reads the detection result and calls tools: metrics lookup, the partner's `search_runbook()` and `check_news()`, and the template list. It returns an `IncidentReport`.
 5. **Check the fix.** The fix checker validates the template values, fills the template, applies it on the virtual MikroTik router, reads back the config, then rolls it back. The result goes in `fix_plans`.
-6. **Alert.** The partner's `speak()` makes a short voice note. The API pushes `incident.opened` and `fix.tested` events to the UI.
 7. **Decide.** The owner opens the incident in the UI and presses Approve or Reject. The API sends a Temporal signal. The workflow waits up to 2 hours.
 8. **Apply and verify.** If approved, the fix is applied (to the virtual router in the demo). The workflow watches the key metric for 5 minutes. Improved → `resolved`. Not improved → automatic rollback → `rolled_back`.
 9. **Trace and score.** Sentry traces every step. The partner's eval runner replays the same path offline to measure accuracy.
@@ -103,7 +103,6 @@ Two people on two networks. Tailscale joins the machines into one private networ
 | --- | --- | --- | --- |
 | Aun | Mac mini M4 | 16 GB RAM, 256 GB disk | Ollama: Gemma 4 E4B (agent) and EmbeddingGemma (embeddings), shared over Tailscale |
 | Aun | Laptop | Intel i7 10th gen, 32 GB RAM, NVIDIA Quadro P520 4 GB | Docker: Temporal dev server, MikroTik CHR virtual router (QEMU), FastAPI, Temporal workers, live collector. This is the integration host. |
-| Partner | PC | NVIDIA GTX 1660 6 GB, 16 GB RAM | Simulator, detector, docs indexer, voice and news modules, web UI, CI and deploy work. Local TabPFN and local EmbeddingGemma. |
 
 **Shared services:**
 
@@ -152,7 +151,6 @@ Aun builds everything that needs his hardware, the router or the runtime glue. T
 | B2 Datasets + simulator | Real data ingest (RIPE Atlas, live collector export), simulator, scenarios, labels, network layout, eval set | `packages/simgen`, `data/`, `eval/` |
 | B3 Detector | TabPFN forecasting, anomaly score, cause classifier → `detect()` | `packages/detector` |
 | B4 Docs search | MikroTik docs → chunks → EmbeddingGemma → pgvector → `search_runbook()` | `packages/runbook` |
-| B5 Side modules | `speak()` with ElevenLabs, `check_news()` with SerpApi | `packages/notify` |
 | B6 Web UI | Next.js dashboard, mobile-first, mock mode first | `apps/web` |
 | B7 Hosted demo | Render + .tech domain, demo mode with replay | `infra/render` |
 | B8 CI | GitHub Actions: lint, tests, CHR template tests; Copilot PR review | `.github/workflows` |
@@ -176,7 +174,6 @@ Python for everything except the UI, which is TypeScript. One repo, one `uv` wor
 | Workflows | Temporal Python SDK + Pydantic AI `TemporalAgent` (Aun) |
 | API | FastAPI + SSE (Aun) |
 | Web | Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, Recharts, `@sentry/nextjs` |
-| Side services | ElevenLabs (TTS), SerpApi (Google search) |
 | Hosting | Render (web + API demo), .tech domain |
 | CI | GitHub Actions, QEMU for CHR |
 
@@ -193,7 +190,6 @@ netcortex/
   packages/fixes/           fix checker                        (Aun)
   packages/detector/        TabPFN detection                   (Partner)
   packages/runbook/         docs ingest + search               (Partner)
-  packages/notify/          ElevenLabs + SerpApi               (Partner)
   packages/simgen/          simulator + data tools             (Partner)
   templates/routeros/       fix templates (YAML)               (Aun)
   data/                     small fixtures, sites.yaml, scenario catalog (Partner)
@@ -274,7 +270,6 @@ def search_runbook(query: str, k: int = 5) -> list[RunbookChunk]:  ...
 # RunbookChunk: title, section, text, source_url, score
 
 # packages/notify
-def speak(text: str, lang: Literal["en", "ur"]) -> bytes: ...          # MP3 bytes
 def check_news(provider: str | None, target: str | None) -> NewsCheck: ...
 # NewsCheck: outage_reported: bool, summary: str, items: list[NewsItem(title, url, published)]
 
@@ -309,7 +304,6 @@ customer_message_ur: str
 | GET | `/metrics?site_id&from&to&series` | Time series for charts, including forecast bands |
 | GET | `/incidents?status` | Incident list, newest first |
 | GET | `/incidents/{id}` | Incident, detection, report, fix plan, dry-run log, timeline |
-| GET | `/incidents/{id}/voice` | MP3 voice alert |
 | POST | `/incidents/{id}/approve` | Sends the Temporal approve signal |
 | POST | `/incidents/{id}/reject` | Sends the Temporal reject signal |
 | POST | `/demo/scenarios` | Body `{site_id, scenario_type, duration_min}` → injects a scenario |
@@ -326,8 +320,6 @@ AGENT_MODEL=<gemma 4 e4b tag>
 EMBED_MODEL=<embeddinggemma tag>
 TABPFN_MODE=cloud            # cloud | local
 TABPFN_API_KEY=              # name per tabpfn-client docs
-ELEVENLABS_API_KEY=
-ELEVENLABS_VOICE_ID=
 SERPAPI_API_KEY=
 SENTRY_DSN_BACKEND=
 NEXT_PUBLIC_SENTRY_DSN=
@@ -347,7 +339,6 @@ Do them in this order. Each task lists what it needs, what to build and when it 
 - [ ] Install Tailscale and join Aun's tailnet. Check `curl http://<mac>:11434/api/tags` works.
 - [ ] Install Entire and run `entire enable --agent codex` in the repo **before the first commit**.
 - [ ] Install `uv`, Node LTS, Docker. Clone the repo.
-- [ ] Get API keys: Prior Labs (accept the free non-commercial license at platform.priorlabs.ai), ElevenLabs, SerpApi. Claim the .tech domain and Render credits at hacktoberfest.com/my/promos.
 - [ ] Install Ollama locally and pull EmbeddingGemma (same tag as Aun). Optional: install local `tabpfn` with CUDA and run its quick-start on the GTX 1660.
 - [ ] Create `AGENTS.md` for Codex: point it to `docs/PARTNER_PLAN.md`, the folder ownership in section 7, and the rules in section 12.
 
@@ -381,7 +372,7 @@ Three jobs inside one `detect()`:
 
 - Keep training context small (a few thousand rows). Cache fitted context per site.
 - `TABPFN_MODE=cloud` uses `tabpfn-client` (TabPFN-3.5). `TABPFN_MODE=local` uses the local package on the GTX 1660. Same interface either way.
-- Write each forecast to the `forecasts` table so the UI can draw bands.
+- Return forecast series to the worker; the worker alone writes the `forecasts` table.
 - Fill `evidence` with short plain sentences ("uplink ether1 at 97% for 6 min").
 - Report precision, recall and detection delay on the eval set in `eval/results/detector.md`.
 
@@ -398,11 +389,10 @@ Three jobs inside one `detect()`:
 
 ### B5. Side modules
 
-- [ ] `speak(text, lang)`: ElevenLabs text-to-speech, a multilingual model that supports Urdu. Return MP3 bytes. Keep text under \~40 words.
 - [ ] `check_news(provider, target)`: SerpApi search for recent outage reports about the upstream provider or a game server, past 24 hours. Return a short summary and links.
-- [ ] Both have a mock mode and a timeout. Failing services must never block an incident.
+- [ ] The news lookup has a mock mode and a timeout. Failing services must never block an incident.
 
-**Done when:** both work from a script, and both return safely when keys are missing.
+**Done when:** the lookup works from a script and returns safely when keys are missing.
 
 ### B6. Web UI
 
@@ -411,10 +401,9 @@ Build in mock mode first (`NEXT_PUBLIC_API_MODE=mock`, fixtures that follow the 
 | Page | What it shows | Actions |
 | --- | --- | --- |
 | Overview | One card per site: health, uplink usage, worst latency now; a live chart of latency with the forecast band | Open a site or incident |
-| Incident detail | Timeline; evidence charts; agent summary, cause and confidence; upstream news result; fix commands and rollback commands; CHR test result; voice alert player | Approve, Reject (with confirm) |
+| Incident detail | Timeline; evidence charts; agent summary, cause and confidence; upstream news result; fix commands and rollback commands; CHR test result; English/Urdu customer messages | Approve, Reject (with confirm) |
 | Incidents | List, newest first, filter by status and site | Open |
 | Demo panel | Scenario picker, site picker, duration | Inject scenario |
-| Settings | Targets per site; switches for TabPFN cloud/local, ElevenLabs, SerpApi | Save |
 
 - Live updates through the SSE `/stream`.
 - Show the fix commands in a monospace block with a copy button. Never imply they were applied before approval.
@@ -586,7 +575,6 @@ The project is complete when a stranger can open the demo, inject an incident, r
 - [ ] Simulator generates, replays and injects all 7 scenarios with labels
 - [ ] `detect()` passes on the eval set, results in `eval/results/detector.md`
 - [ ] `search_runbook()` returns the right docs for the 4 template topics
-- [ ] `speak()` and `check_news()` work and fail safely
 - [ ] Web UI: full approve flow works live on a phone
 - [ ] Hosted demo live on the .tech domain
 - [ ] CI green; Copilot review enabled

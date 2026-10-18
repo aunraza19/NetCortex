@@ -23,7 +23,7 @@ The detector regressions cover past-only features, finite physical bounds, SDK
 quantile layout, all five horizons, capped fit contexts, stale/future and mixed
 source rows, total-loss RTT absence, gaps in historical forecast comparison,
 nonfinite model outputs, separate split windows and safe observation paths.
-Provider tests cover malformed responses, timeouts, unavailable audio/news and
+Provider tests cover malformed responses, timeouts, unavailable news and
 embedding identity/dimension checks. UI tests cover confirmation, failed router
 checks, duplicate submissions, missing incidents, site backup topology and rollback.
 
@@ -62,17 +62,39 @@ measurements are included in the profile. Raw/generated files and the active
 coverage live in [the RIPE summary](../data/ripe-baseline-summary.json) and
 [calibration report](../data/calibration-report.md).
 
+## Historical baseline and current integration
+
+The 87-test evidence above predates the merged core. The new integration is
+checked against actual shared models; see [core acceptance cases](CORE_INTEGRATION_VALIDATION.md)
+and the core integration progress notes. The existing fixture accuracy report
+is historical and does not establish real TabPFN performance.
+
 ## Pending shared and external checks
 
-Upstream `main` still contained only README.md at the integration refresh. There
-is no verified `netcortex_core`, backend, workflow, collector or template harness
-to integrate against. [Contract requests](CONTRACT_REQUESTS.md) specify what is
-needed. Public Python wrappers fail explicitly at those boundaries.
+Core, agent, fixes and collector are now merged, including db.fetch_site and
+DNS/subscriber contracts. Public wrappers bind to actual netcortex_core types.
+API/OpenAPI, workflows and the template harness still need their respective
+runtime implementations. Database migration 001 was already applied by Aun and
+was not rerun.
 
 No live database/pgvector query, EmbeddingGemma search, TabPFN inference,
-ElevenLabs audio, SerpApi outage check, Sentry event, deployed Render/domain or
+SerpApi outage check, Sentry event, deployed Render/domain or
 live approval/apply/verification/rollback has been established. Their account
 access, credentials, exact model identity and/or Aun's code are pending. No
 provider-free result is presented as evidence for those integrations.
 
 See [the start guide](START_HERE.md) to run the independent implementation.
+
+## Merged-core acceptance run
+
+After rebase onto main fc297c1 (core, agent, collector, fixes and removal merged):
+root Ruff passes; 200 offline tests pass, one live agent test deselected, including
+lead-authored core boundary cases. The frontend format/lint/typecheck/build and
+both browser suites passed: 14 dashboard plus three HTTP/SSE cases. Provider keys
+were configured locally with masked input; they were not printed or committed.
+Main's root files remain byte-identical, and uv regenerated its lockfile.
+
+This acceptance run verifies real core schema bindings and simulator transactions
+through fake DB tests. Real TabPFN requires an explicit TRAIN/normal-VALIDATION
+preparation step; the public adapter currently raises unavailable without that
+state. The next small PR is limited to that Gate 2 path. No DB migration ran.

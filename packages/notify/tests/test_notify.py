@@ -1,61 +1,9 @@
-import sys
 from datetime import UTC, datetime
-from types import SimpleNamespace
 
 import httpx
 import pytest
 from netcortex_notify import service
-from netcortex_notify.service import _check_news, _read_body, _recent_date, _safe_url, _speak
-
-
-def test_speak_missing_keys_and_validation():
-    assert _speak("alert", "en", api_key=None, voice_id=None) == b""
-    with pytest.raises(ValueError):
-        _speak("hello", "fr", api_key=None, voice_id=None)
-    with pytest.raises(ValueError):
-        _speak("word " * 41, "en", api_key=None, voice_id=None)
-
-
-def test_speak_validates_audio_and_propagates_rate_limit():
-    def audio(request):
-        assert request.url.params["output_format"] == "mp3_44100_128"
-        return httpx.Response(200, headers={"content-type": "audio/mpeg"}, content=b"mp3")
-
-    client = httpx.Client(transport=httpx.MockTransport(audio))
-    assert _speak("short alert", "ur", api_key="test", voice_id="voice", client=client) == b"mp3"
-    client.close()
-
-
-def test_speak_non_audio_timeout_and_public_failure_are_safe(monkeypatch):
-    client = httpx.Client(
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                200, headers={"content-type": "application/json"}, content=b"{}"
-            )
-        )
-    )
-    with pytest.raises(RuntimeError, match="non-audio"):
-        _speak("short alert", "en", api_key="test", voice_id="voice", client=client)
-    client.close()
-    client = httpx.Client(
-        transport=httpx.MockTransport(
-            lambda request: (_ for _ in ()).throw(httpx.ReadTimeout("simulated"))
-        )
-    )
-    with pytest.raises(httpx.ReadTimeout):
-        _speak("short alert", "en", api_key="test", voice_id="voice", client=client)
-    client.close()
-    monkeypatch.setattr(
-        service,
-        "_load_settings",
-        lambda: SimpleNamespace(elevenlabs_api_key="test", elevenlabs_voice_id="voice"),
-    )
-    monkeypatch.setattr(
-        service,
-        "_speak",
-        lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ReadTimeout("simulated")),
-    )
-    assert service.speak("short alert", "en") == b""
+from netcortex_notify.service import _check_news, _read_body, _recent_date, _safe_url
 
 
 def test_response_reader_enforces_total_deadline(monkeypatch):
@@ -98,10 +46,6 @@ def test_news_does_not_flag_unrelated_or_non_outage_results():
     result = _check_news("ExampleISP", "game", api_key="test", client=client)
     assert result["outage_reported"] is False
     client.close()
-    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(429)))
-    with pytest.raises(RuntimeError, match="rate limit"):
-        _speak("short alert", "en", api_key="test", voice_id="voice", client=client)
-    client.close()
 
 
 def test_news_timeout_is_unavailable():
@@ -124,19 +68,9 @@ def test_news_missing_key_and_unsafe_urls_are_not_outages():
 
 
 def test_public_check_news_preserves_unavailable_state(monkeypatch):
-    class NewsCheck:
-        def __init__(self, *, outage_reported, summary, items):
-            self.outage_reported = outage_reported
-            self.summary = summary
-            self.items = items
+    from netcortex_core import Settings
 
-    class NewsItem:
-        def __init__(self, **fields):
-            self.fields = fields
-
-    core = SimpleNamespace(NewsCheck=NewsCheck, NewsItem=NewsItem)
-    monkeypatch.setitem(sys.modules, "netcortex_core", core)
-    monkeypatch.setattr(service, "_load_settings", lambda: SimpleNamespace(serpapi_api_key=None))
+    monkeypatch.setattr(service, "_load_settings", lambda: Settings(_env_file=None))
     result = service.check_news("isp", None)
     assert result.outage_reported is False
     assert "unavailable" in result.summary.lower()

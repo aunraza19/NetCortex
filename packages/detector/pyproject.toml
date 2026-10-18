@@ -7,7 +7,7 @@ name = "netcortex-detector"
 version = "0.1.0"
 description = "Past-only TabPFN network metric detector"
 requires-python = ">=3.12"
-dependencies = ["numpy>=2.0", "pandas>=2.2", "pyarrow>=18"]
+dependencies = ["netcortex-core", "numpy>=2.0", "pandas>=2.2", "pyarrow>=18"]
 
 [project.optional-dependencies]
 cloud = ["tabpfn-client>=0.6.1", "tabpfn>=9.2.0", "tabpfn-extensions>=0.6.3", "torch>=2.14.1"]

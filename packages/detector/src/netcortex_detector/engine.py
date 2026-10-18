@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
+from netcortex_core import (
+    Cause,
+    DetectionResult,
+    ForecastPoint,
+    MetricsWindow,
+    ModuleUnavailable,
+    SeriesForecast,
+    Settings,
+    series_key,
+)
 
 CAUSES = (
     "uplink_congestion",
@@ -23,7 +32,7 @@ PROBE_COLUMNS = {"time", "site_id", "target", "rtt_ms", "jitter_ms", "loss_pct"}
 IFACE_COLUMNS = {"time", "site_id", "iface", "util_pct", "drops", "errors"}
 
 
-class DetectorUnavailable(RuntimeError):
+class DetectorUnavailable(ModuleUnavailable):
     """The requested core or model integration is absent or failed."""
 
 
@@ -268,10 +277,10 @@ def run_engine(
         else:
             cause, confidence = backend.cause(vector)
             confidence = float(confidence)
-            raw_anomaly = float(backend.anomaly(vector))
-            if not np.isfinite(confidence) or not np.isfinite(raw_anomaly):
-                raise DetectorUnavailable("backend returned a nonfinite score or confidence")
-            anomaly = float(np.clip(raw_anomaly, 0.0, 1.0))
+        raw_anomaly = float(backend.anomaly(vector))
+        if not np.isfinite(confidence) or not np.isfinite(raw_anomaly):
+            raise DetectorUnavailable("backend returned a nonfinite score or confidence")
+        anomaly = float(np.clip(raw_anomaly, 0.0, 1.0))
     except Exception as exc:
         raise DetectorUnavailable(
             f"{backend.provenance} inference failed ({type(exc).__name__})"
@@ -446,22 +455,95 @@ def _empty_result(site_id: str, at: pd.Timestamp, provenance: str, status: str) 
     }
 
 
-def detect(site_id: str, window: Any, history: Any) -> Any:
-    """Core-facing API; it binds only to Aun's real core contract when available."""
-    try:
-        core = importlib.import_module("netcortex_core")
-        result_type = core.DetectionResult
-        required = ("probe_metrics", "iface_metrics", "as_of")
-        if any(not hasattr(window, name) for name in required):
-            raise AttributeError("MetricsWindow lacks probe_metrics, iface_metrics, or as_of")
-    except (ImportError, AttributeError) as exc:
-        raise DetectorUnavailable(
-            "public detect() is unavailable until netcortex_core publishes DetectionResult "
-            "and the approved MetricsWindow contract; use run_engine() with injected inputs"
-        ) from exc
-    raise DetectorUnavailable(
-        f"core adapter requires approved field mapping for {result_type.__name__}"
+def detect(site_id: str, window: MetricsWindow, history: MetricsWindow) -> DetectionResult:
+    """Run detection on one site's observations and return the shared core contract."""
+    if not isinstance(window, MetricsWindow) or not isinstance(history, MetricsWindow):
+        raise DetectorUnavailable("detect requires core MetricsWindow inputs")
+    if window.probe_metrics.empty or window.iface_metrics.empty:
+        raise DetectorUnavailable("probe and interface observations are required")
+    if not window.probe_metrics["site_id"].eq(site_id).all() or not window.iface_metrics[
+        "site_id"
+    ].eq(site_id).all():
+        raise DetectorUnavailable("metrics window contains rows for a different site")
+
+    # Prior history is context only. It supplies observations, never labels or expected causes.
+    probes = _combine_observations(history.probe_metrics, window.probe_metrics)
+    interfaces = _combine_observations(history.iface_metrics, window.iface_metrics)
+    target_roles = {
+        target: ("dns:" + target[4:] if target.startswith("dns:") else target)
+        for target in probes.get("target", pd.Series(dtype=str)).dropna().astype(str).unique()
+    }
+    settings = Settings()
+    token = settings.tabpfn_token.get_secret_value() if settings.tabpfn_token else None
+    from netcortex_detector import providers
+
+    backend = providers.TabPFNBackend(
+        settings.tabpfn_mode, access_token=token, timeout_s=settings.http_timeout_s
     )
+    result = run_engine(
+        probes,
+        interfaces,
+        site_id=site_id,
+        as_of=window.as_of,
+        backend=backend,
+        config=DetectorConfig(target_roles=target_roles),
+    )
+    if result["availability"] != "available":
+        raise DetectorUnavailable(f"detector data unavailable ({result['status']})")
+
+    grouped: dict[str, list[ForecastPoint]] = {}
+    for row in result["forecasts"]:
+        metric = row["metric"]
+        key = _forecast_series_key(metric)
+        grouped.setdefault(key, []).append(
+            ForecastPoint(
+                time=pd.Timestamp(row["target_time"]).to_pydatetime(),
+                p10=row["p10"],
+                p50=row["p50"],
+                p90=row["p90"],
+            )
+        )
+    series = [
+        SeriesForecast(series_key=key, points=sorted(points, key=lambda point: point.time))
+        for key, points in sorted(grouped.items())
+    ]
+    provenance = str(result["provenance"])
+    is_fixture = provenance.startswith("fixture:")
+    mode = "mock" if is_fixture else settings.tabpfn_mode
+    model = "fixture_persistence" if is_fixture else backend.provenance
+    return DetectionResult(
+        is_anomaly=result["is_anomaly"],
+        score=result["anomaly_score"],
+        cause_guess=Cause(result["cause"]),
+        cause_confidence=result["cause_confidence"],
+        evidence=result["evidence"],
+        series=series,
+        model=model,
+        mode=mode,
+    )
+
+
+def _forecast_series_key(metric: str) -> str:
+    """Map a raw feature metric to the matching shared core series key."""
+    for prefix, kind, field, role_prefix in (
+        ("rtt_ms_", "probe", "rtt_ms", "target:"),
+        ("loss_pct_", "probe", "loss_pct", "target:"),
+        ("iface_util_pct_", "iface", "util_pct", "interface:"),
+    ):
+        if metric.startswith(prefix):
+            name = metric.removeprefix(prefix).removeprefix(role_prefix)
+            if not name:
+                break
+            return series_key(kind, name, field)
+    raise DetectorUnavailable("backend forecast metric cannot be mapped to a core series")
+
+
+def _combine_observations(history: pd.DataFrame, current: pd.DataFrame) -> pd.DataFrame:
+    frames = [frame for frame in (history, current) if not frame.empty]
+    if not frames:
+        return current.copy()
+    combined = pd.concat(frames, ignore_index=True).drop_duplicates(keep="last")
+    return combined
 
 
 def fingerprint(frame: pd.DataFrame) -> str:

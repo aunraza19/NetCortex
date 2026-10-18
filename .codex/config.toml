@@ -1,0 +1,18 @@
+# Start a new sandboxed Codex session with this project profile to enforce reads.
+# An already-running unrestricted session cannot acquire this boundary retroactively.
+default_permissions = "netcortex"
+
+[permissions.netcortex.filesystem]
+glob_scan_max_depth = 8
+":minimal" = "read"
+
+[permissions.netcortex.filesystem.":workspace_roots"]
+"." = "write"
+".env" = "deny"
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*credentials*.env" = "deny"
+"secrets" = "deny"
+
+[permissions.netcortex.network]
+enabled = true

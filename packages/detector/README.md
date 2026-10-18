@@ -1,6 +1,6 @@
 # netcortex-detector
 
-Past-only feature construction and injected TabPFN 3.5 adapters for network metrics. The package has no dependency on Aun's unpublished core types. `run_engine()` accepts probe and interface DataFrames, aware UTC `as_of`, site, an injected backend, and optional train/validation inputs. `detect(site_id, window, history)` is the future core adapter and raises `DetectorUnavailable` until the real `netcortex_core.DetectionResult` and `MetricsWindow` contract can be bound.
+Past-only feature construction and TabPFN 3.5 adapters for network metrics. `run_engine()` accepts probe and interface DataFrames, aware UTC `as_of`, site, an injected backend, and optional explicit training inputs. `detect(site_id, window, history)` consumes actual core `MetricsWindow` objects and returns core `DetectionResult` with grouped forecast series. The public API receives no labeled TRAIN data or calibrated normal VALIDATION reference, so actual TabPFN cause/anomaly inference fails explicitly until that data contract is supplied; it never substitutes fixtures. Explicit fixture provenance is labeled `mode="mock"`. The detector returns forecasts in memory and performs no database writes.
 
 Base installation keeps the heavy inference stack optional:
 

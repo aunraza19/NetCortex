@@ -30,6 +30,196 @@ def test_seed_reproducible_and_schema_cadence():
     assert p1.loss_pct.between(0, 100).all() and p1.rtt_ms.gt(0).all()
 
 
+def test_core_site_mapping_and_subscribers_have_healthy_and_active_rows():
+    site = simulator.site_from_fixture("market-cafe")
+    assert [uplink.role.value for uplink in site.uplinks] == ["primary", "backhaul"]
+    assert all(target.role.value for target in site.targets)
+    assert not any(uplink.role.value == "backup" for uplink in site.uplinks)
+    start = datetime(2026, 10, 12, tzinfo=UTC)
+    label = {
+        "site_id": "north-tower",
+        "cause": "heavy_user",
+        "start": start + pd.Timedelta(minutes=1),
+        "end": start + pd.Timedelta(minutes=2),
+    }
+    rows = simulator.generate_subscribers(
+        [label], start=start, end=start + pd.Timedelta(minutes=3), site_ids=["north-tower"]
+    )
+    assert rows.time.min() < label["start"]
+    assert rows.loc[rows.time >= label["start"], "rx_bps"].max() > 10_000_000
+
+
+def test_scenario_labels_match_template_parameter_contracts():
+    from netcortex_fixes import validate
+
+    site = simulator.sites()["sites"][0]
+    start = datetime(2026, 10, 12, tzinfo=UTC)
+    for cause in CAUSES:
+        label = simulator._label(site, cause, start, start + pd.Timedelta(minutes=15), 9)
+        if label["template_id"] == "none":
+            assert label["params"] == {}
+        else:
+            validate(label["template_id"], label["params"])
+
+    gateway_site = {
+        **site,
+        "uplinks": [{**site["uplinks"][0], "gateway": "192.0.2.1"}],
+        "backup_uplink": {**site["backup_uplink"], "gateway": "192.0.2.2"},
+    }
+    failover = simulator._label(
+        gateway_site, "uplink_down", start, start + pd.Timedelta(minutes=15), 10
+    )
+    assert failover["template_id"] == "failover_route"
+    validate(failover["template_id"], failover["params"])
+
+
+class _Transaction:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        self.conn.rolled_back = exc_type is not None
+        return False
+
+
+class _Cursor:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def execute(self, sql, params=None):
+        self.conn.sql.append(sql)
+        self.conn.last_overlap = "SELECT 1 FROM scenario_labels" in sql
+
+    def fetchone(self):
+        return (1,) if self.conn.overlap and self.conn.last_overlap else None
+
+
+class _Conn:
+    def __init__(self, overlap=False):
+        self.overlap = overlap
+        self.rolled_back = False
+        self.sql = []
+
+    def cursor(self):
+        return _Cursor(self)
+
+    def transaction(self):
+        return _Transaction(self)
+
+
+class _Pool:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def connection(self):
+        class Connection:
+            def __enter__(_self):
+                return self.conn
+
+            def __exit__(_self, *_):
+                return False
+
+        return Connection()
+
+
+def test_public_inject_preserves_site_and_rolls_back_on_failure(monkeypatch):
+    now = datetime(2026, 10, 12, tzinfo=UTC)
+    conn = _Conn()
+    upserted_sites = []
+    monkeypatch.setattr(
+        simulator.core_db, "fetch_site", lambda *_: simulator.site_from_fixture("north-tower")
+    )
+    monkeypatch.setattr(
+        simulator.core_db, "upsert_site", lambda _conn, site: upserted_sites.append(site)
+    )
+    monkeypatch.setattr(simulator.core_db, "insert_probe_metrics", lambda *_: 1)
+    monkeypatch.setattr(simulator.core_db, "insert_iface_metrics", lambda *_: 1)
+    monkeypatch.setattr(simulator.core_db, "insert_subscriber_metrics", lambda *_: 1)
+    monkeypatch.setattr(
+        simulator,
+        "generate",
+        lambda **kwargs: (
+            pd.DataFrame(
+                [
+                    {
+                        "time": now,
+                        "site_id": "north-tower",
+                        "target": "1.1.1.1",
+                        "kind": "icmp",
+                        "rtt_ms": 20.0,
+                        "jitter_ms": 1.0,
+                        "loss_pct": 0.0,
+                        "source": "sim",
+                    }
+                ]
+            ),
+            pd.DataFrame(
+                columns=[
+                    "time",
+                    "site_id",
+                    "iface",
+                    "rx_bps",
+                    "tx_bps",
+                    "util_pct",
+                    "drops",
+                    "errors",
+                    "source",
+                ]
+            ),
+            [
+                simulator._label(
+                    simulator.sites()["sites"][0],
+                    kwargs["scenario_type"],
+                    now,
+                    now + pd.Timedelta(minutes=kwargs["duration_min"]),
+                    kwargs["seed"],
+                )
+            ],
+        ),
+    )
+    label = simulator.inject(
+        "north-tower", "uplink_congestion", 2, 8, now=now, database=_Pool(conn)
+    )
+    assert label.start_at == now and label.end_at == now + pd.Timedelta(minutes=2)
+    assert not conn.rolled_back
+    assert not upserted_sites
+    assert any("pg_advisory_xact_lock" in sql for sql in conn.sql)
+    assert any("INSERT INTO scenario_labels" in sql for sql in conn.sql)
+    assert not any("CREATE " in sql for sql in conn.sql)
+    with pytest.raises(ValueError, match="1320"):
+        simulator.inject("north-tower", "uplink_congestion", 1321, 8, now=now, database=_Pool(conn))
+    with pytest.raises(ValueError, match="unknown site"):
+        simulator.inject("missing-site", "uplink_congestion", 2, 8, now=now, database=_Pool(conn))
+
+    overlap_conn = _Conn(overlap=True)
+    with pytest.raises(ValueError, match="overlaps"):
+        simulator.inject(
+            "north-tower", "uplink_congestion", 2, 8, now=now, database=_Pool(overlap_conn)
+        )
+    assert overlap_conn.rolled_back
+
+    monkeypatch.setattr(
+        simulator.core_db,
+        "insert_probe_metrics",
+        lambda *_: (_ for _ in ()).throw(RuntimeError("db failure")),
+    )
+    failed_conn = _Conn()
+    with pytest.raises(RuntimeError, match="db failure"):
+        simulator.inject(
+            "north-tower", "uplink_congestion", 2, 8, now=now, database=_Pool(failed_conn)
+        )
+    assert failed_conn.rolled_back
+
+
 def test_packaged_site_resource_works_without_repository_root(monkeypatch, tmp_path):
     import yaml
 
@@ -39,7 +229,7 @@ def test_packaged_site_resource_works_without_repository_root(monkeypatch, tmp_p
     canonical = yaml.safe_load(canonical_path.read_text())
     assert layout == canonical
     p, _, _ = generate(days=1, hours=1, seed=2, site_id="north-tower", normal_only=True)
-    assert len(p) == 360 * 5
+    assert len(p) == 360 * 6
 
 
 def test_scenarios_distinguishable_and_labelled():
@@ -52,9 +242,10 @@ def test_scenarios_distinguishable_and_labelled():
         affected = p[(p.time >= label["start"]) & (p.time < label["end"])]
         assert len(affected) > 0 and affected.loss_pct.between(0, 100).all()
         if cause == "uplink_down":
-            assert affected[affected.target != "gateway"].loss_pct.mean() >= 95
-            assert affected[affected.target != "gateway"].loss_pct.eq(100).all()
-            assert affected[affected.target != "gateway"].rtt_ms.isna().all()
+            outside = affected[(affected.kind == "icmp") & (affected.target != "gateway")]
+            assert outside.loss_pct.mean() >= 95
+            assert outside.loss_pct.eq(100).all()
+            assert outside.rtt_ms.isna().all()
             assert "ether2" in set(iface.iface)
         elif cause == "game_route_issue":
             assert (
@@ -93,8 +284,12 @@ def test_scenarios_distinguishable_and_labelled():
             assert traffic.rx_bps.max() > 50_000_000 and traffic.rx_bps.min() < 10_000_000
 
 
-def test_public_inject_fails_without_shared_core():
-    with pytest.raises(RuntimeError, match="Core injection unavailable"):
+def test_public_inject_reports_missing_database(monkeypatch):
+    from netcortex_core import ModuleUnavailable
+
+    settings = simulator.Settings
+    monkeypatch.setattr(simulator, "Settings", lambda: settings(_env_file=None))
+    with pytest.raises(ModuleUnavailable, match="DATABASE_URL"):
         inject("north-tower", "uplink_congestion", 15, 4)
 
 

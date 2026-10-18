@@ -7,10 +7,8 @@ import {
   ChevronRight,
   ExternalLink,
   Info,
-  Play,
   RotateCcw,
   ShieldCheck,
-  Volume2,
 } from "lucide-react";
 import { transport } from "@/lib/transport";
 import type { Incident } from "@/lib/types";
@@ -34,9 +32,7 @@ export function IncidentDetail({ id }: { id: string }) {
   const [item, setItem] = useState<Incident | null>(null),
     [err, setErr] = useState(""),
     [dialog, setDialog] = useState<"approve" | "reject" | null>(null),
-    [busy, setBusy] = useState(false),
-    [voiceErr, setVoiceErr] = useState(""),
-    [voiceUrl, setVoiceUrl] = useState("");
+    [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const load = useCallback(
     () =>
@@ -301,37 +297,6 @@ export function IncidentDetail({ id }: { id: string }) {
                       ? "This incident is resolved."
                       : "Approval is unavailable until the router test passes."}
               </div>
-            )}
-          </section>
-          <section className="panel voice-panel">
-            <div className="voice-icon">
-              <Volume2 size={16} />
-            </div>
-            <div className="voice-copy">
-              <strong>Voice alert</strong>
-              <small>Short incident summary</small>
-            </div>
-            <button
-              className="play-button"
-              aria-label="Play voice alert"
-              onClick={() => {
-                setVoiceErr("");
-                void transport
-                  .voice(item.id)
-                  .then(setVoiceUrl)
-                  .catch((e) => setVoiceErr(e.message));
-              }}
-            >
-              <Play size={14} fill="currentColor" />
-            </button>
-            {voiceErr && <p className="voice-error">{voiceErr}</p>}
-            {voiceUrl && (
-              <audio
-                className="voice-player"
-                controls
-                src={voiceUrl}
-                aria-label="Incident voice alert"
-              />
             )}
           </section>
         </aside>

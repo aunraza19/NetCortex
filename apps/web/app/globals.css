@@ -1181,53 +1181,6 @@ select:focus-visible {
   border: 1px solid #293841;
   border-radius: 5px;
 }
-.voice-panel {
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-.voice-icon {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: #8cb8d7;
-  background: #1b2934;
-  border-radius: 6px;
-}
-.voice-copy {
-  flex: 1;
-}
-.voice-copy strong,
-.voice-copy small {
-  display: block;
-}
-.voice-copy strong {
-  font-size: 10px;
-}
-.voice-copy small {
-  font-size: 9px;
-  color: #788993;
-  margin-top: 3px;
-}
-.play-button {
-  width: 27px;
-  height: 27px;
-  border: 1px solid #34434c;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #a3b7bf;
-  background: #111a20;
-}
-.voice-error {
-  width: 100%;
-  font-size: 9px;
-  color: #e2a3a0;
-  margin: 0 0 0 37px;
-}
 .dialog-overlay {
   position: fixed;
   inset: 0;

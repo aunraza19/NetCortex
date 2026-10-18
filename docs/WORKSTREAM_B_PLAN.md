@@ -15,6 +15,9 @@ Every worker records its files, commands, results, decisions and blockers in a
 handoff. Exact 60% compaction is controlled by the host; use token thresholds
 where supported and persist handoffs regardless.
 
+Core and voice removal are now merged. Follow [the lead acceptance cases](CORE_INTEGRATION_VALIDATION.md)
+for the current integration, then limit follow-up work to Gate 2.
+
 ## Prerequisites and contracts
 
 - Python 3.12, uv, Node LTS, Entire Codex hooks, GitHub authentication.
@@ -22,7 +25,7 @@ where supported and persist handoffs regardless.
   modules and serialized fixtures are built. Secrets never enter source control.
 - Aun supplies core plus subscriber traffic/IP evidence, DNS resolution timing,
   target/interface roles, backup topology, forecast write/upsert ownership,
-  replay/injection lifecycle and Settings/API/SSE/voice failure contracts.
+  replay/injection lifecycle and Settings/API/SSE failure contracts.
 - Require those additions before claiming affected features work. Never infer
   subscriber IPs or causes from evaluation labels.
 - Free tiers and credits only; no purchase or paid upgrade is authorized.
@@ -43,18 +46,19 @@ where supported and persist handoffs regardless.
    TabPFN 3.5 cloud/local regression quantiles for 1-5 minutes, unsupervised
    scoring, cause classification. Bound contexts, cache fits and batch requests.
    Normalize scores on validation data; freeze thresholds before held-out tests.
-   Compare observations only to forecasts created earlier. Persist forecasts once.
+   Compare observations only to forecasts created earlier. Return series; the worker
+   alone persists forecasts.
    Inference failures are unavailable, never healthy or silently mocked.
 5. Retrieval: official RouterOS sources and headings, 300-500-word chunks,
    EmbeddingGemma through Ollama, pgvector, source URLs and top-k search. Verify
    768 dimensions and matching model identity. Vector search first; hybrid optional.
-6. Notifications: ElevenLabs English/Urdu MP3, short alerts, SerpApi recent
-   provider/target outage search. Finite deadlines and explicit unavailable states.
+6. News: SerpApi recent provider/target outage search, finite deadlines and explicit
+   unavailable states. Customer messages remain English and Urdu text.
 7. G2: offline module tests pass; actual service smoke results reported separately.
 8. Dashboard: Next.js App Router/TypeScript/Tailwind/shadcn/Recharts; Overview,
    Incidents, Incident Detail, Demo Panel; Settings waits for a backend interface.
    Responsive dark UI with Pakistan times, forecast bands, evidence, commands,
-   rollback, CHR results, voice and timeline. Fixture/live transports share one
+   rollback, CHR results, customer messages and timeline. Fixture/live transports share one
    interface. Generate API types from Aun's OpenAPI. SSE reconnect/refetch and
    duplicate-event handling. Confirm decisions and prevent duplicate submissions;
    commands are applied only when the API confirms the corresponding state.

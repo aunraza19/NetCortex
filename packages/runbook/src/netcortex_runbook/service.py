@@ -5,14 +5,12 @@ import re
 import time
 import urllib.robotparser
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
-
-if TYPE_CHECKING:
-    from netcortex_core import RunbookChunk  # type: ignore[import-not-found]
+from netcortex_core import ModuleUnavailable, RunbookChunk, Settings
 
 SOURCES = {
     "queues": "https://help.mikrotik.com/docs/spaces/ROS/pages/328088/Queues",
@@ -137,10 +135,11 @@ def _embed(client: httpx.Client, text: str, base_url: str, model: str) -> list[f
     payload = response.json()
     if not isinstance(payload, dict):
         raise TypeError("Ollama returned a malformed embedding response")
-    if payload.get("model") != model:
-        raise ValueError(
-            f"Ollama model mismatch: requested {model!r}, received {payload.get('model')!r}"
-        )
+    reported_model = payload.get("model")
+    if reported_model != model and not (
+        model == "embeddinggemma" and reported_model == "embeddinggemma:latest"
+    ):
+        raise ValueError(f"Ollama model mismatch: requested {model!r}, received {reported_model!r}")
     embeddings = payload.get("embeddings")
     vector = embeddings[0] if isinstance(embeddings, list) and embeddings else None
     if not isinstance(vector, list) or len(vector) != 768:
@@ -157,10 +156,10 @@ def _embed(client: httpx.Client, text: str, base_url: str, model: str) -> list[f
 def _validate_model(model: str) -> None:
     if (
         not isinstance(model, str)
-        or not model.startswith("embeddinggemma:")
-        or not model.split(":", 1)[1]
+        or model != "embeddinggemma"
+        and not re.fullmatch(r"embeddinggemma:[^\s:]+", model)
     ):
-        raise ValueError("embed_model must be an explicitly configured full embeddinggemma tag")
+        raise ValueError("embed_model must be embeddinggemma or an explicit embeddinggemma tag")
 
 
 def _store_chunks(conn: Any, chunks: list[tuple[Chunk, list[float]]], embed_model: str) -> None:
@@ -226,54 +225,55 @@ def ingest(
         ) as conn:
             _store_chunks(conn, chunks, embed_model)
         return len(chunks)
+    except ModuleUnavailable:
+        raise
+    except Exception as exc:
+        raise ModuleUnavailable(f"runbook ingest unavailable ({type(exc).__name__})") from exc
     finally:
         if own:
             client.close()
-
-
-def _settings_and_contract() -> tuple[Any, Any]:
-    try:
-        from netcortex_core import RunbookChunk, Settings  # type: ignore[import-not-found]
-    except ImportError as exc:
-        raise RuntimeError(
-            "live search requires Aun's published netcortex_core Settings and RunbookChunk contract"
-        ) from exc
-    return Settings, RunbookChunk
 
 
 def search_runbook(query: str, k: int = 5) -> list[RunbookChunk]:
     """Search pgvector; return core RunbookChunk items after its contract is published."""
     if not query.strip() or not 1 <= k <= 20:
         raise ValueError("query must be non-empty and k must be 1..20")
-    Settings, RunbookChunk = _settings_and_contract()
     settings = Settings()
     model = settings.embed_model
     try:
         _validate_model(model)
     except ValueError as exc:
-        raise RuntimeError(str(exc)) from exc
-    with httpx.Client(timeout=httpx.Timeout(15, connect=5)) as client:
-        vector = _embed(client, query, settings.ollama_base_url, model)
-    import psycopg
+        raise ModuleUnavailable(f"runbook search unavailable: {exc}") from exc
+    if settings.database_url is None:
+        raise ModuleUnavailable("runbook search unavailable: database URL is not configured")
+    try:
+        with httpx.Client(timeout=httpx.Timeout(15, connect=5)) as client:
+            vector = _embed(client, query, settings.ollama_base_url, model)
+        import psycopg
 
-    with (
-        psycopg.connect(
-            settings.database_url, connect_timeout=5, options="-c statement_timeout=5000"
-        ) as conn,
-        conn.cursor() as cur,
-    ):
-        cur.execute(
-            "SELECT source_url,title,section,text,embedding <=> %s::vector AS distance "
-            "FROM runbook_chunks WHERE embed_model=%s ORDER BY embedding <=> %s::vector "
-            "LIMIT %s",
-            (
-                "[" + ",".join(map(str, vector)) + "]",
-                model,
-                "[" + ",".join(map(str, vector)) + "]",
-                k,
-            ),
-        )
-        rows = cur.fetchall()
+        database_url = settings.database_url.get_secret_value()
+        with (
+            psycopg.connect(
+                database_url, connect_timeout=5, options="-c statement_timeout=5000"
+            ) as conn,
+            conn.cursor() as cur,
+        ):
+            cur.execute(
+                "SELECT source_url,title,section,text,embedding <=> %s::vector AS distance "
+                "FROM runbook_chunks WHERE embed_model=%s "
+                "ORDER BY embedding <=> %s::vector LIMIT %s",
+                (
+                    "[" + ",".join(map(str, vector)) + "]",
+                    model,
+                    "[" + ",".join(map(str, vector)) + "]",
+                    k,
+                ),
+            )
+            rows = cur.fetchall()
+    except ModuleUnavailable:
+        raise
+    except Exception as exc:
+        raise ModuleUnavailable(f"runbook search unavailable ({type(exc).__name__})") from exc
     return [
         RunbookChunk(source_url=r[0], title=r[1], section=r[2], text=r[3], score=1.0 - float(r[4]))
         for r in rows

@@ -10,8 +10,8 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Start on `b/workstream-b`; isolate parallel workers in `b/data-simgen`, `b/runbook-notify`, `b/web-dashboard` worktrees | Keep main untouched and concurrent writes separate | Lead integrates owned paths and validates before pushing |
 | Coding workers use `gpt-6-luna`, medium reasoning | User requested this model and lead/worker division | Lead specifies, reviews, tests and handles integration |
 | Aun owns core, Settings, migrations, API, workflows, agent and router infrastructure | The shared build brief explicitly reserves those contracts | We write requests and use lazy imports; no replacement schemas |
-| Build independent engines with plain data and explicit fixture modes | Core and external credentials are absent | Fixture success does not establish live integration |
-| Gate heavy-user and DNS claims on new telemetry contracts | Aggregate interface stats cannot identify a subscriber, and ping is not DNS resolution timing | Never fabricate offending IPs or claim DNS diagnosis from ping alone |
+| Build independent engines with plain data and explicit fixture modes | Core was initially absent; its merged contracts now bind public wrappers | Fixture success does not establish live integration |
+| Use core DNS/subscriber contracts for the corresponding observations | Core now carries subscriber IP/traffic and DNS-kind probes; ICMP remains separate | Never fabricate offending IPs or claim DNS diagnosis from ping alone |
 | Separate training, validation and final evaluation | Tuning thresholds on final tests inflates measured quality | Freeze thresholds before held-out scoring and report actual denominators |
 | Failure is unavailable, never an implicit normal result | A failed diagnostic must not tell the operator a broken network is healthy | Provider errors stay visible; live transport never silently falls back to fixtures |
 | Use TabPFN Python adapters in the application; MCP only for experiments | The detector needs a stable callable and explicit configuration | Connecting an MCP does not replace the runtime integration |
@@ -49,3 +49,18 @@ At the final integration refresh, upstream main still contains only README.md. A
 core/backend contracts. Database, tailnet, API keys, Sentry projects, Render and
 domain access are not yet supplied. Their live checks remain pending until
 verified; none are replaced with invented pass results.
+
+## Core integration and scope update
+
+Rebased after PR #5 onto main fc297c1. Main's four root files remain byte-identical;
+uv lock regenerated the lockfile. The lead wrote contract/validation cases before
+three Luna medium agents changed owned paths. Public adapters import real core
+models, preserve SecretStr and ModuleUnavailable, and never write forecasts from
+detect. DNS/subscriber observations and atomic simulator injection now use core.
+The embedding model setting is embeddinggemma. Customer messages stay text.
+
+Current follow-up is Gate 2 only, in a small separate PR: prepare legitimate TRAIN
+and VALIDATION contexts, inject sim rows, and call actual TabPFN through detect.
+A missing trained backend is an explicit unavailable result, not mock inference.
+See [security verification](docs/SECURITY_VERIFICATION.md) for the redacted public
+history/checkpoint audit and the current sandbox enforcement limitation.

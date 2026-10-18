@@ -1,49 +1,43 @@
-# Contract questions for Aun
+# Shared contract answers and remaining runtime checks
 
-These are proposals and integration questions only. They do not change shared contracts. Aun must approve the answers and publish the source-of-truth definitions before Workstream B binds to them.
+Aun answered the original questions in [merged core PR #2](https://github.com/aunraza19/NetCortex/pull/2).
+The code in packages/core is authoritative. [PR #5](https://github.com/aunraza19/NetCortex/pull/5)
+removed speech generation and its database storage. This file supersedes the original unanswered checklist.
 
-## Core package and shared types
+- Python 3.12; netcortex-core / netcortex_core. Import shared schemas and Settings directly.
+- Secrets are SecretStr: unwrap at their network/DB boundary; never log raw values.
+- MetricsWindow includes probe, interface and subscriber DataFrames with UTC as_of.
+- DNS observations: kind=dns, target=dns:<resolver>, rtt_ms is lookup response time.
+- SubscriberMetric carries IP and traffic; hosted demos use synthetic addresses only.
+- Site combines primary, backup and backhaul uplinks; ProbeTarget carries role/kind/host.
+- detect returns DetectionResult (score, cause_guess, series, cloud/local/mock mode).
+- Only the worker persists forecasts, uniquely keyed by site/series/model/time.
+- inject writes source=sim rows from now for duration plus one ScenarioLabel; reject
+  overlapping active injection for a site. Keep these writes atomic.
+- get_pool, insert metric helpers, upsert_site and fetch_site are shared DB helpers.
+- search_runbook score is one minus cosine distance. EMBED_MODEL=embeddinggemma.
+- check_news returns NewsCheck(available=False, ...) when unavailable.
+- Text customer messages remain English and Urdu.
+- Migration 001 is already applied on Tiger Cloud: do not rerun it or run migrations
+  as part of partner setup, tests, injection or detection.
 
-- Confirm the distribution name and import name for `packages/core`; `netcortex_core` is the expected import namespace, but the distribution name is unresolved.
-- Publish supported Python version, package exports, schema versions, and compatibility policy.
-- Confirm exact types and field names for probe/interface metrics, forecasts, incidents, detection results, incident reports, fix plans, and template parameters.
-- Clarify timestamp timezone/format, units, nullability, source labels, and identifier formats.
+## API and workflow agreements
 
-## Settings and API
+Root paths follow the plan; actual generated client types wait for OpenAPI from A9.
+Errors use detail with 404/409/503; an empty successful collection stays 200 [].
+The hackathon build has one owner role, no authentication. Settings stays read-only.
+SSE events use numeric IDs, named events and JSON payloads, replay Last-Event-ID,
+and a 15-second comment heartbeat. Metric events are transient.
 
-- Confirm Settings field names, defaults, environment variable names, validation behavior, and secret handling.
-- Confirm API base path, auth mechanism, owner/user role mapping, and how demo mode is represented.
-- Provide request/response examples and explicit status/error payloads for incident list/detail, approval/rejection, history, and health endpoints.
-- Define explicit failure semantics for upstream timeouts, unavailable model/provider, stale data, authorization failure, and partial results. Errors must remain distinguishable from a successful empty response.
+Approval waits up to two hours. The workflow verifies five minutes after applying
+and rolls back on failed improvement. Public demo approvals replay saved timelines.
+The template harness contract is infra/chr/test_templates.py with --json PATH;
+CI keeps the readiness gate until that file exists.
 
-## SSE and subscriber telemetry
+## Scope now
 
-- Confirm SSE endpoint, event envelope, event IDs/replay behavior, heartbeat cadence, reconnect expectations, and event names/payloads (`incident.opened`, `fix.tested`, and others).
-- Specify whether subscriber identifiers/IPs are exposed, redacted, or role-gated in API events and the UI; identify retention and access policy.
-- Clarify how a subscriber can be identified for heavy-user analysis without exposing unnecessary personal data.
-- Extend MetricsWindow/storage with observed per-subscriber traffic and IP identity;
-  aggregate interface counters cannot identify an offending user. Supplemental
-  simulator fixtures are experimental until this contract is approved.
-- Add explicit DNS resolution duration/outcome observations; ICMP RTT to a DNS
-  server is not a DNS lookup measurement.
-- Publish target roles and interface/backhaul mapping, uplink capacities and
-  configured backup gateways so causes and fix parameters derive from observations.
-- Define Settings read/update API endpoints before enabling editable UI Settings.
-
-## Timing and role mapping
-
-- Confirm collection intervals, detector lookback/history window, forecast horizon, and freshness thresholds for probe and interface telemetry.
-- Confirm role mapping for owner, operator, and read-only/demo viewers, including permissions for approve/reject and subscriber-level evidence.
-- Confirm workflow timing and expiry behavior for approvals and for post-change observation/rollback.
-
-## Forecast persistence and injection lifecycle
-
-- Define a unique key and conflict/upsert policy for forecasts, including site, metric/target, model/version, and forecast timestamp dimensions as appropriate.
-- Identify the sole forecast writer and the expected transactional behavior when a detection run retries.
-- Define simulator injection start/end semantics, source labeling, scenario-label linkage, cleanup/expiry behavior, and whether injections can overlap.
-- Clarify how generated/replayed rows differ from injected rows and which records are safe to retain in a hosted demo.
-
-## Router test integration
-
-- Confirm location and invocation contract for Aun's CHR harness, expected CHR image/license setup, and machine-readable result format.
-- Workstream B CI will call `infra/chr/test_templates.py` only when Aun provides it. Until then, the router template CI gate is pending; no substitute test will be reported as a router test.
+Finish core binding and removal, push the existing PR and mark ready after checks.
+Then work only on Gate 2: real simgen injection to actual TabPFN detect returning
+DetectionResult. Agent, fixes and runtime services remain Aun-owned. Provider-free
+checks cannot establish Gate 2. No new shared contract is needed to prepare a
+legitimate detector training artifact from TRAIN and VALIDATION data.

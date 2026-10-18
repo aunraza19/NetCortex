@@ -1,6 +1,8 @@
 import argparse
 import json
 
+from netcortex_core import ModuleUnavailable, Settings
+
 from .service import fixture_search, ingest, search_runbook
 
 
@@ -23,16 +25,12 @@ def main() -> None:
     elif args.command == "search":
         output = [item.model_dump() for item in search_runbook(args.query, args.k)]
     else:
-        try:
-            from netcortex_core import Settings  # type: ignore[import-not-found]
-        except ImportError as exc:
-            raise RuntimeError(
-                "live indexing requires Aun's published netcortex_core.Settings"
-            ) from exc
         settings = Settings()
+        if settings.database_url is None:
+            raise ModuleUnavailable("runbook ingest unavailable: database URL is not configured")
         output = {
             "indexed_chunks": ingest(
-                database_url=settings.database_url,
+                database_url=settings.database_url.get_secret_value(),
                 ollama_base_url=settings.ollama_base_url,
                 embed_model=settings.embed_model,
             )

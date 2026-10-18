@@ -20,7 +20,6 @@ walkthrough rather than treating this target audience as customer validation.
 ## What the partner work builds
 
 Workstream B supplies reproducible telemetry scenarios, a detector adapter,
-source-linked RouterOS documentation retrieval, voice/outage-check adapters and
 the operator dashboard. The shared API, agent, durable workflows and virtual-router
 test harness belong to Aun's workstream.
 
@@ -71,7 +70,7 @@ That makes it possible to evaluate a different model or narrow its task without
 rewriting the dashboard and workflows.
 
 Cloud add-ons have different boundaries. TabPFN cloud receives the submitted
-feature data; ElevenLabs receives alert text; SerpApi receives the outage query.
+SerpApi supplies optional recent provider/target outage searches; customer messages remain text.
 They must be optional and described accurately. Our code's MIT license does not
 replace the licenses of model weights, datasets or third-party services. Check
 the applicable [TabPFN model terms](https://github.com/PriorLabs/TabPFN) before

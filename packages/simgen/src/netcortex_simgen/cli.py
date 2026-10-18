@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -337,21 +336,28 @@ def _write(
 
 
 def _load_database(p: pd.DataFrame, i: pd.DataFrame, source: str) -> None:
-    if not os.getenv("NETCORTEX_DB_KEYS_CONFIRMED") == "1":
-        raise RuntimeError(
-            "Database load disabled until Aun confirms repeat-safe database keys; "
-            "set NETCORTEX_DB_KEYS_CONFIRMED=1 only after the contract is published"
-        )
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL is required")
-    import psycopg
+    from netcortex_core import IfaceMetric, ProbeMetric, Source
+    from netcortex_core import db as core_db
+    from netcortex_core.settings import Settings
 
-    with psycopg.connect(dsn) as conn, conn.transaction():
-        # The approved conflict keys are intentionally a gate. Never guess table keys.
-        raise RuntimeError(
-            "Core table key/upsert contract is not yet confirmed; no rows were written"
-        )
+    source_value = Source(source)
+    setting = Settings()
+    if setting.database_url is None:
+        raise RuntimeError("DATABASE_URL is required")
+    probes = []
+    for item in p.to_dict("records"):
+        item["source"] = source_value
+        probes.append(ProbeMetric.model_validate(item))
+    interfaces = []
+    for item in i.to_dict("records"):
+        item["source"] = source_value
+        interfaces.append(IfaceMetric.model_validate(item))
+    with core_db.get_pool(setting).connection() as conn, conn.transaction():
+        # Bounded batches keep replay transactions from growing without limit.
+        for offset in range(0, len(probes), 1000):
+            core_db.insert_probe_metrics(conn, probes[offset : offset + 1000])
+        for offset in range(0, len(interfaces), 1000):
+            core_db.insert_iface_metrics(conn, interfaces[offset : offset + 1000])
 
 
 def _read_source(
@@ -408,7 +414,8 @@ def _read_source(
         edge = pd.to_datetime(p.time, utc=True).max() - delta
         p = p[pd.to_datetime(p.time, utc=True) >= edge]
         if len(i) and "time" in i:
-            i = i[pd.to_datetime(i.time, utc=True) >= edge]
+            i_edge = pd.to_datetime(i.time, utc=True).max() - delta
+            i = i[pd.to_datetime(i.time, utc=True) >= i_edge]
     return p, i
 
 
@@ -567,6 +574,12 @@ def main(argv: list[str] | None = None) -> int:
         _write(p, i, labels, ROOT / "data/generated", extra)
         print(f"Wrote {len(p)} probe and {len(i)} interface rows")
     elif args.command == "inject":
+        if not mock:
+            from .simulator import inject
+
+            label = inject(args.site, args.type, args.duration, args.seed)
+            print(f"Injected {label.scenario_type.value} at {label.site_id} ({label.id})")
+            return 0
         p, i, label = inject_frames(args.site, args.type, args.duration, args.seed)
         p = p[(p.time >= label["start"]) & (p.time < label["end"])].copy()
         i = i[(i.time >= label["start"]) & (i.time < label["end"])].copy()
@@ -595,10 +608,7 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
         labels_path.write_text(json.dumps(labels, indent=2), encoding="utf-8")
-        print(
-            f"Fixture persisted as {key}; core injection/persistence unavailable "
-            "until its lifecycle contract is published"
-        )
+        print(f"Fixture persisted as {key}; this mock path did not write to the database")
     elif args.command == "load":
         p, i = _read_source(args.source, args.last)
         if mock:

@@ -1,66 +1,55 @@
-# Head handoff: Workstream B
+# Workstream lead handoff
 
-Updated 2026-10-18. Integration repo is `NetCortex`, branch `b/workstream-b`.
-User authorized full B1-B9/B11 excluding Tinker, Luna medium coding workers,
-lead review/integration, tested branch push and decision/flow documents.
-Only free tiers/credits; no purchase. Do not ask again for Git identity/auth.
+Current task: user required rebase after merged core/agent/removal, direct shared
+contracts, SecretStr handling, real DNS/subscriber simulation, no forecast DB
+writes in detect, removal of speech generation, push/ready existing PR, then
+Gate 2 only in small follow-up PRs. Keep Python 3.12 and main root files exactly.
 
-## Integrated code
+## Integration complete locally
 
-- Four uv workspace packages: simgen, detector, runbook, notify.
-- Next.js dashboard with fixture and live HTTP/SSE transports.
-- Python/frontend CI, separate pinned CHR bootstrap smoke/template jobs.
-- Render Node blueprint; no deployed service or domain claimed.
-- Root/package/app/eval/CI/hosting decision.md and flow.md, start guide,
-  validation plan/results, contract requests and honest submission draft.
-- Main README remains Aun-owned and unchanged. MIT license follows brief.
+- Rebased b/workstream-b onto origin/main fc297c1. Backup branch exists for the
+  old public head; push must use explicit force-with-lease against 44e4a7b.
+- Main pyproject.toml/.gitignore/LICENSE/.gitattributes are byte-identical.
+  uv lock regenerated, uv sync --all-packages --locked succeeded.
+- Lead wrote docs/CORE_INTEGRATION_VALIDATION.md and four contract test files
+  before delegating to three Luna medium workers (shared integration owned paths).
+- Direct core DetectionResult/MetricsWindow/Settings/ModuleUnavailable bindings;
+  canonical forecast series including DNS colons; worker alone writes forecasts.
+- Simgen DNS-kind probes, continuous subscriber rows, Site mapping, actual atomic
+  injection with advisory locking/overlap protection, existing-site preservation.
+- News returns real NewsCheck; embeddinggemma bare model accepted, SecretStr
+  handled at DB/provider boundary. No speech code/player; customer text preserved.
+- Ruff passed; 200 offline tests passed, 1 live agent test deselected. Frontend
+  format/lint/typecheck/build + 14 dashboard/3 live browser cases passed.
+- Public history plus 18 explicitly fetched Entire refs audited with Gitleaks:
+  zero confirmed secrets. 2092 generic findings were all dated SDK feature flags.
+  Reports ignored. Automatic checkpoint pushing remains disabled locally.
+- A local masked-input window wrote ignored .env; agent did not open it. User
+  pasted credentials in chat; never repeat them in tools, docs or responses.
+  Do not publish this current transcript. No rotation or migrations performed.
+- .codex/config.toml provides future-session deny-read rules. Current unrestricted
+  host cannot acquire that sandbox retroactively; limitation documented honestly.
 
-## Actual local checks
+## Delivery sequence
 
-- Locked base workspace sync passed; optional heavy model extras excluded.
-- Root Ruff passed; combined Python/bootstrap suite: 87 passed in 7.30s,
-  branch coverage 68%. Current NumPy/pandas emit deprecation warnings.
-- Four wheels/source distributions built; installed simgen/detector CLI help passed.
-- Frontend format/lint/typecheck/production build passed.
-- 14 desktop/mobile fixture E2E + 3 mocked-live HTTP/SSE E2E passed.
-- Production npm audit clean; five high development entries share one unpatched
-  braces advisory. Web decision.md records why an incompatible downgrade was rejected.
-- Real RIPE: 11,819 rows, three PK probes/ASNs, October 11-17; three daily
-  measurement request gaps. Raw rows ignored; provenance/report committed.
-- Calibration explicitly opted into a narrow public-DNS ping-role proxy from
-  measured root-server paths, with provenance and route uncertainty. No DNS lookup claim.
-- Generated 80 cases EACH train/validation/test (ten/class), separate seeds/windows.
-- Fixture held-out report: 80/80 available; cause accuracy .375; event precision 1;
-  recall 62/70; median ~.097s; zero false alerts over .20833 normal site-days.
-  Single snapshots do not measure detection delay or continuous operation.
-- Cloud-unavailable report: 0/80 model cases scored; never counts absence as normal.
-- CHR offline: 15 tests. Corrected real Linux CHR boot, authenticated REST and
-  cleanup passed: https://github.com/aunraza19/NetCortex/actions/runs/39131915789
-- Corrected Linux Python/frontend CI passed: https://github.com/aunraza19/NetCortex/actions/runs/39131915864
-  Both push and PR runs passed on d60ffac; template apply/read-back/rollback
-  remains skipped because Aun harness is absent.
+Commit owned source/test/docs and regenerated lock; scan staged changes without
+printing credentials. Force-with-lease push to existing PR #1, inspect CI and
+GitGuardian, repair failures, mark ready only after checks pass. No migrations.
 
-## GitHub and external gates
+## Gate 2 follow-up only
 
-Git author techieworld2 / user-provided email is local to repo. GCM contains
-multiple identities; repo explicitly selects techieworld2. Verified push/workflow
-access, no admin. Never print/store credential values. A helper outside the repo
-can pass the existing GCM token to gh through the process environment only.
-Entire enabled locally before first commit; telemetry/session auto-upload disabled.
-No verified captured/uploaded coding transcript claimed.
+Use a small new B branch from delivered integration and draft PR. Real TabPFN
+public detect still lacks explicitly prepared TRAIN labels/normal VALIDATION
+reference; this is our training responsibility, not missing Aun schemas. Proposed
+startup API prepares a data-only artifact from simulator TRAIN/VALIDATION only,
+loads/caches a configured backend, and lets public detect use it. No TEST sidecars
+at inference; no pickled SDK models or fake real inference.
 
-Upstream refresh still showed main at 4f84168 with README only. Aun must provide
-core, Settings, API/SSE, migrations, workflows, collector, agent/fixes and template
-harness. Public shared-type wrappers deliberately fail until those contracts exist.
-DB/model/provider/Render/domain access is missing. Tiger/TabPFN MCP configured,
-not authenticated/verified. RouterOS and Sentry skills installed/read/applied.
-
-## Delivery
-
-Branch pushed; draft PR https://github.com/aunraza19/NetCortex/pull/1 is open.
-The first runs exposed a transient browser assertion and serial CRLF double
-submission. Both fixes were verified by successful push and PR CI runs.
-Documentation links those implementation-run results. Shared runtime/provider
-and deployment gates remain explicit; the PR stays draft for Aun's contract review.
-Copilot automatic review requires Aun admin/eligible plan; it is not enabled.
-No merge, purchase or live deployment has been performed.
+User credentials are in .env for application runtime only; never use tool reads
+or output raw Settings/errors. Use dedicated simulated site, preserve home-lab,
+no migrations. Inject now; obtain past-only context/current MetricsWindow; call
+actual TabPFN and validate actual DetectionResult, mode/model, finite ordered
+future forecast points and no detector DB writes. Save sanitized timing/result.
+Embedding installation, deployment, broad evaluation and other work are outside
+this requested follow-up. Prior Labs model/client adapters may need SDK fixes
+based on actual calls; keep the patch and tests focused.

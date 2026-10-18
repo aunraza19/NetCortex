@@ -1,6 +1,6 @@
 # NetCortex: entry points, connections and exits
 
-This map distinguishes the partner's code from Aun's pending shared runtime.
+This map distinguishes the partner's code from Aun's shared runtime.
 Package `flow.md` files give exact implementation-level names and examples.
 This document is updated as each component is integrated.
 
@@ -22,9 +22,6 @@ flowchart TD
     N --> SE[SerpApi]
     A --> X[Aun: template checker / isolated CHR]
     X --> API[Aun: FastAPI + SSE]
-    A --> V[Partner: speak]
-    V --> EL[ElevenLabs MP3]
-    EL --> API
     API <--> UI[Partner: Next.js dashboard]
     UI --> Q{Human decision}
     Q -->|approve| IW[Aun: incident workflow]
@@ -44,7 +41,6 @@ flowchart TD
 | `simgen replay` / `inject` | site, cause, duration, seed | Active simulator runtime; DB writes need Aun's keys/runtime agreement | Current metrics and scenario label; explicit missing-runtime/contract failure |
 | `detect(site_id, window, history)` | observed shared MetricsWindow | Lag features -> TabPFN forecasts/anomaly/cause | Shared DetectionResult and approved forecast writes, or unavailable error |
 | `search_runbook(query, k)` | question and result count | Ollama query embedding -> pgvector retrieval | Shared RunbookChunk objects with source URLs |
-| `speak(text, lang)` | short text, en/ur | ElevenLabs with finite deadlines | MP3 bytes; empty bytes when audio unavailable |
 | `check_news(provider, target)` | upstream provider/target | Recent SerpApi search | Shared NewsCheck with links; explicit unavailable summary on failure |
 | Dashboard navigation | site/incident selection | Fixture transport or Aun's HTTP API | Rendered status/evidence, loading state or visible error |
 | Dashboard decision | confirmed approve/reject | POST to Aun; GET authoritative incident after acknowledgement; workflow owns subsequent state | Acknowledged decision, followed by SSE/refetch; no assumed live success |
@@ -53,9 +49,8 @@ flowchart TD
 ## HTTP boundary owned by Aun
 
 The draft API exposes `GET /sites`, `/metrics`, `/incidents`,
-`/incidents/{id}`, `/incidents/{id}/voice`, `GET /stream`,
 `POST /incidents/{id}/approve`, `/incidents/{id}/reject`, and
-`POST /demo/scenarios`. Actual response types must come from Aun's OpenAPI.
+`POST /demo/scenarios`. Actual response types will come from Aun's API OpenAPI when published.
 SSE event names are `metric`, `incident.opened`, `incident.updated`, `fix.tested`
 and `fix.applied`. Reconnect must refresh state; repeated event IDs must not
 repeat effects. Settings reads/writes are a pending contract.
@@ -77,3 +72,16 @@ the separate CHR workflow boots a pinned router and checks authenticated REST.
 Its template job runs only when Aun's actual test harness exists; boot success
 alone does not establish template validity. External authentication is setup,
 not an automatic claim of a working connection.
+
+## Merged core boundary
+
+simgen.inject enters a site-locked transaction, preserves existing Site topology,
+inserts sim ProbeMetric/IfaceMetric/SubscriberMetric observations and one
+ScenarioLabel, then commits or rolls back together. DNS uses kind=dns and target
+dns:1.1.1.1. The detector consumes actual MetricsWindow inputs and returns
+DetectionResult with canonical SeriesForecast/ForecastPoint data. detect performs
+no forecast writes; MonitorSiteWorkflow owns persistence. Core exposes fetch_site.
+
+The detector needs an explicitly prepared real TabPFN context for cloud/local
+inference. Gate 2 will prepare it from TRAIN and normal VALIDATION observations,
+without reading TEST labels at inference. Provider failures remain unavailable.

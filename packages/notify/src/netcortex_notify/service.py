@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+from netcortex_core import NewsCheck, NewsItem, Settings
 
-if TYPE_CHECKING:
-    from netcortex_core import NewsCheck  # type: ignore[import-not-found]
-
-VOICE_MODEL = "eleven_v3"  # official docs list Urdu for v3; multilingual_v2 lacks Urdu support
-ELEVEN_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 SERP_URL = "https://serpapi.com/search.json"
-logger = logging.getLogger(__name__)
+
+
+def _load_settings() -> Settings:
+    """Load the shared core settings for the public entry point."""
+    return Settings()
 
 
 def _read_body(response: httpx.Response, *, max_bytes: int, total_seconds: float) -> bytes:
@@ -29,75 +28,6 @@ def _read_body(response: httpx.Response, *, max_bytes: int, total_seconds: float
         if time.monotonic() - started > total_seconds:
             raise httpx.TimeoutException("provider response exceeded its total deadline")
     return bytes(body)
-
-
-def _load_settings() -> Any:
-    try:
-        from netcortex_core import Settings  # type: ignore[import-not-found]
-    except ImportError as exc:
-        raise RuntimeError(
-            "live notification calls require Aun's published netcortex_core.Settings"
-        ) from exc
-    return Settings()
-
-
-def _speak(
-    text: str,
-    lang: str,
-    *,
-    api_key: str | None,
-    voice_id: str | None,
-    client: httpx.Client | None = None,
-) -> bytes:
-    if lang not in {"en", "ur"}:
-        raise ValueError("lang must be 'en' or 'ur'")
-    if not text.strip() or len(text.split()) > 40:
-        raise ValueError("voice alert must contain 1..40 words")
-    if not api_key or not voice_id:
-        return b""
-    own = client is None
-    client = client or httpx.Client(timeout=httpx.Timeout(3, connect=2), follow_redirects=False)
-    try:
-        with client.stream(
-            "POST",
-            ELEVEN_URL.format(voice_id=voice_id),
-            params={"output_format": "mp3_44100_128"},
-            headers={
-                "xi-api-key": api_key,
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-            },
-            json={
-                "text": text,
-                "model_id": VOICE_MODEL,
-                "language_code": "ur" if lang == "ur" else "en",
-            },
-        ) as response:
-            if response.status_code == 429:
-                raise RuntimeError("ElevenLabs rate limit; voice is unavailable")
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "").lower()
-            if content_type and "audio/" not in content_type and "octet-stream" not in content_type:
-                raise RuntimeError("ElevenLabs returned a non-audio response")
-            audio = _read_body(response, max_bytes=1_000_000, total_seconds=12)
-            if not audio:
-                raise RuntimeError("ElevenLabs returned an empty audio response")
-            return audio
-    finally:
-        if own:
-            client.close()
-
-
-def speak(text: str, lang: str) -> bytes:
-    """Return MP3 bytes; an unconfigured voice service is safely unavailable as b''."""
-    settings = _load_settings()
-    try:
-        return _speak(
-            text, lang, api_key=settings.elevenlabs_api_key, voice_id=settings.elevenlabs_voice_id
-        )
-    except (httpx.HTTPError, RuntimeError) as exc:
-        logger.warning("ElevenLabs voice unavailable (%s)", type(exc).__name__)
-        return b""
 
 
 def _safe_url(value: Any) -> str | None:
@@ -114,38 +44,38 @@ def _safe_url(value: Any) -> str | None:
     return value
 
 
-def _recent_date(value: Any, now: datetime) -> bool:
+def _published_date(value: Any, now: datetime) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
-        return False
-    # SerpApi commonly gives relative labels; accept explicit recent durations and ISO dates.
+        return None
     text = value.strip().lower()
-    if text in {
-        "today",
-        "1 hour ago",
-        "2 hours ago",
-        "3 hours ago",
-        "4 hours ago",
-        "5 hours ago",
-        "6 hours ago",
-        "12 hours ago",
-    }:
-        return True
     try:
         parsed = datetime.fromisoformat(text.replace("z", "+00:00"))
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=UTC)
-        return now - timedelta(hours=24) <= parsed.astimezone(UTC) <= now + timedelta(minutes=5)
+        parsed = parsed.astimezone(UTC)
+        return parsed if now - timedelta(hours=24) <= parsed <= now + timedelta(minutes=5) else None
     except ValueError:
         pass
+    if text == "today":
+        parsed = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        return parsed
+    if text == "yesterday":
+        return now.astimezone(UTC) - timedelta(hours=24)
     match = re.fullmatch(r"(\d+)\s*(minute|hour|day)s?\s+ago", text)
     if match:
         amount = int(match.group(1))
-        return (
-            (match.group(2) == "minute" and amount <= 1440)
-            or (match.group(2) == "hour" and amount <= 24)
-            or (match.group(2) == "day" and amount == 1)
-        )
-    return False
+        delta = {
+            "minute": timedelta(minutes=amount),
+            "hour": timedelta(hours=amount),
+            "day": timedelta(days=amount),
+        }[match.group(2)]
+        if delta <= timedelta(hours=24):
+            return now.astimezone(UTC) - delta
+    return None
+
+
+def _recent_date(value: Any, now: datetime) -> bool:
+    return _published_date(value, now) is not None
 
 
 def _check_news(
@@ -213,7 +143,10 @@ def _check_news(
             r"\b(?:outages?|down|degraded|disruptions?|unavailable|failures?|incidents?|offline)\b"
         )
         for item in items:
-            if not isinstance(item, dict) or not _recent_date(item.get("date"), timestamp):
+            if not isinstance(item, dict):
+                continue
+            published = _published_date(item.get("date"), timestamp)
+            if published is None:
                 continue
             url = _safe_url(item.get("link"))
             title = item.get("title")
@@ -222,7 +155,7 @@ def _check_news(
                     {
                         "title": title.strip()[:200],
                         "url": url,
-                        "published": str(item.get("date", ""))[:100],
+                        "published": published.isoformat(),
                     }
                 )
                 snippet = str(item.get("snippet", ""))
@@ -264,19 +197,22 @@ def _check_news(
 
 
 def check_news(provider: str | None, target: str | None) -> NewsCheck:
-    """Search recent outage reports and return core NewsCheck once the shared contract exists."""
+    """Search recent outage reports and return the shared core contract."""
     settings = _load_settings()
-    result = _check_news(provider, target, api_key=settings.serpapi_api_key)
-    try:
-        from netcortex_core import NewsCheck, NewsItem  # type: ignore[import-not-found]
-    except ImportError as exc:
-        raise RuntimeError(
-            "check_news requires Aun's published netcortex_core.NewsCheck and NewsItem contracts"
-        ) from exc
+    api_key = settings.serpapi_api_key.get_secret_value() if settings.serpapi_api_key else None
+    result = _check_news(provider, target, api_key=api_key)
+    timestamp = datetime.now(UTC)
     items = [
-        NewsItem(title=item["title"], url=item["url"], published=item["published"])
+        NewsItem(
+            title=item["title"],
+            url=item["url"],
+            published=_published_date(item.get("published"), timestamp),
+        )
         for item in result["links"]
     ]
     return NewsCheck(
-        outage_reported=result.get("outage_reported", False), summary=result["summary"], items=items
+        available=result["available"],
+        outage_reported=result.get("outage_reported", False),
+        summary=result["summary"],
+        items=items,
     )

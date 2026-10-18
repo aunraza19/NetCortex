@@ -14,6 +14,6 @@ NetCortex is being built for small network operators who need an affordable way 
 
 Open-weight local inference is intended to keep network context on-site, support diagnosis during internet outages, and avoid per-token charges for the core workflow. These are design goals; claims about measured privacy, reliability, cost, or accuracy require implementation and evidence.
 
-The hosted demo is planned to use simulated/replayed telemetry. TabPFN cloud sends anonymized metrics to its provider and its current license terms may restrict commercial use; verify the applicable terms before making product claims. Cloud voice and outage-search integrations are optional and may require paid credentials.
+The hosted demo is planned to use simulated/replayed telemetry. TabPFN cloud sends anonymized metrics to its provider and its current license terms may restrict commercial use; verify the applicable terms before making product claims. Cloud outage-search integrations are optional and may require paid credentials.
 
 Before publication, replace this draft with verified implementation details, evaluation results, limitations, a working demo link if available, and an actual first-user account only if one exists and consents to being described.
