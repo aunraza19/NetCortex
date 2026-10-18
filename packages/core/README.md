@@ -10,7 +10,7 @@ from netcortex_core import Cause, DetectionResult, MetricsWindow, Settings, get_
 | --- | --- |
 | `schemas.py` | `Cause`, `TemplateId`, `IncidentStatus`, metric rows, `MetricsWindow`, `DetectionResult`, `RunbookChunk`, `NewsCheck`, `ScenarioLabel`, `IncidentReport`, `FixPlan`, `Incident`, `Event`, `Site`, series-key helpers |
 | `settings.py` | `Settings`: one field per env var, lowercase (`DATABASE_URL` -> `database_url`). Secrets are `SecretStr`. |
-| `interfaces.py` | `Protocol`s for `detect`, `search_runbook`, `speak`, `check_news`, `inject`, `investigate`; `ModuleUnavailable`; `conforms()` for tests |
+| `interfaces.py` | `Protocol`s for `detect`, `search_runbook`, `check_news`, `inject`, `investigate`; `ModuleUnavailable`; `conforms()` for tests |
 | `db.py` | psycopg 3 pool (`get_pool()`) and insert helpers for metrics, forecasts, incidents and events |
 | `migrations/` | SQL migrations, applied by `netcortex-migrate` |
 

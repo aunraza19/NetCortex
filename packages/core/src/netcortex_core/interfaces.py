@@ -3,14 +3,13 @@
 Failure rules (the same for every module):
 - detect() and search_runbook() raise ModuleUnavailable when their model, provider or data
   can't produce a real answer. An empty list from search_runbook() means "no matches".
-- speak() returns b"" when voice is unavailable.
 - check_news() returns NewsCheck(available=False, summary=<reason>) when it can't check.
 - Every network call inside a module has a finite timeout (Settings.http_timeout_s by default).
 Callers treat any of these as "skip this step"; an unavailable module never blocks an incident.
 """
 
 import inspect
-from typing import Literal, Protocol
+from typing import Protocol
 
 from netcortex_core.schemas import (
     Cause,
@@ -35,10 +34,6 @@ class Detect(Protocol):  # packages/detector
 
 class SearchRunbook(Protocol):  # packages/runbook
     def __call__(self, query: str, k: int = 5) -> list[RunbookChunk]: ...
-
-
-class Speak(Protocol):  # packages/notify; returns MP3 bytes
-    def __call__(self, text: str, lang: Literal["en", "ur"]) -> bytes: ...
 
 
 class CheckNews(Protocol):  # packages/notify
