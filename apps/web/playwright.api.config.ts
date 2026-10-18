@@ -17,6 +17,7 @@ export default defineConfig({
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
   },
+  projects: [{ name: "phone", use: { ...devices["Pixel 7"] } }],
   webServer: [
     {
       command: `"${python}" ../../eval/api_demo.py --port 8137 --awaiting`,
