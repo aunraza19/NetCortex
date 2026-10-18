@@ -149,11 +149,3 @@ def test_stale_data_skips_detection(monkeypatch):
     monkeypatch.setattr(activities.db, "fetch_window", lambda conn, site, start, end: old)
     result = activities._monitor("sim-tower")
     assert result.status == "skipped" and "stale" in result.reason
-
-
-def test_no_second_opinion_without_tabpfn(monkeypatch):
-    from netcortex_agent import modules
-
-    monkeypatch.setattr(modules, "_tabpfn_ready", False)
-    monkeypatch.setattr(activities.db, "get_pool", lambda: pytest.fail("no DB needed"))
-    assert activities._second_opinion(uuid4(), "sim-tower", NOW) is None

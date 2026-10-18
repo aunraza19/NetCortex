@@ -16,7 +16,6 @@ from uuid import UUID
 
 import netcortex_fixes as fixes
 import sentry_sdk
-from netcortex_agent import modules
 from netcortex_core import get_settings
 from netcortex_core.tracing import init_sentry
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
@@ -102,10 +101,6 @@ async def run() -> None:
     settings = get_settings()
     init_sentry("worker", settings)
     fixes.load_templates()  # read the YAML once, outside the workflow sandbox
-    if settings.detector_artifact:  # fit TabPFN in the background; minutes on its cloud
-        configuring = asyncio.create_task(  # noqa: F841 (kept so the task isn't collected)
-            asyncio.to_thread(modules.configure_tabpfn, settings.detector_artifact)
-        )
     client = await Client.connect(settings.temporal_address, plugins=[PydanticAIPlugin()])
     timing = Timing(
         monitor_interval_s=settings.monitor_interval_s,

@@ -6,7 +6,6 @@ at the point of use. NEXT_PUBLIC_* variables are read by apps/web only.
 """
 
 from functools import lru_cache
-from pathlib import Path
 from typing import Literal
 
 from pydantic import AliasChoices, Field, SecretStr
@@ -31,9 +30,6 @@ class Settings(BaseSettings):
     tabpfn_token: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("TABPFN_TOKEN", "TABPFN_API_KEY")
     )
-    # Training artifact from netcortex_detector.prepare_detector(). When set, the worker
-    # fits TabPFN at startup and asks it for a second opinion on each new incident.
-    detector_artifact: Path | None = None
 
     # Optional cloud add-ons; missing keys make them unavailable, never blocking
     serpapi_api_key: SecretStr | None = None
@@ -45,7 +41,7 @@ class Settings(BaseSettings):
     demo_mode: bool = False
     monitor_interval_s: float = Field(default=60.0, gt=0)  # how often each site is checked
     approval_timeout_s: float = Field(default=7200.0, gt=0)  # then the incident is rejected
-    verify_wait_s: float = Field(default=300.0, ge=0)  # watch time after applying a fix
+    verify_wait_s: float = Field(default=60.0, ge=0)  # watch after a fix; production: 300
     api_cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     monitor_sites: list[str] = ["home-lab", "sim-tower"]  # watched by the worker
     http_timeout_s: float = Field(default=10.0, gt=0)  # default for every outbound call

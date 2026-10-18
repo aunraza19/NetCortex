@@ -1,4 +1,4 @@
-# NetCortex — Claude Code context (Workstream A, Aun)
+  # NetCortex — Claude Code context (Workstream A, Aun)
 
 ## Read first
 
@@ -32,7 +32,8 @@
 - **Fallback:** if Tailscale fails, pull the partner's code from GitHub and run everything on the laptop. The laptop reaches the Mac over the home LAN.
 - **Database:** Tiger Cloud (TimescaleDB + pgvector), shared by both people.
 - **CHR test router:** QEMU for Windows (TCG; WHPX loses the NICs) runs RouterOS 7.24.5 locally. `infra\chr\start.ps1` boots it (REST `127.0.0.1:9180`, SSH `127.0.0.1:9122`), `reset.ps1` restores the baseline. `CHR_PASSWORD` is in `.env` only. All 4 templates pass `infra/chr/test_templates.py`.
-- **Runtime (A2/A8/A9):** Temporal CLI via winget (`temporal server start-dev --db-filename var/temporal.db`, UI :8233), `uv run worker` (monitors `MONITOR_SITES`: home-lab, sim-tower), API `uv run uvicorn netcortex_api.main:app --port 8000`. Until the partner's modules merge, `packages/agent/stubs.py` provides a rule-based `detect()` and a minimal `inject()` for `sim-tower` (layout mirrors the CHR baseline).
+- **Runtime (A2/A8/A9):** `infra\scripts\start-demo.ps1` starts everything (Temporal dev server with `var/temporal.db`, UI :8233; CHR; `uv run worker`; the API with the dashboard at http://localhost:8000/; the collector from `..\NetCortex-run`), and `stop-demo.ps1` stops it. The rule-based `stub_detector.detect()` is the only detector, and `stub_injector.inject()` (site `sim-tower`, laid out like the CHR baseline) is the only injector. `VERIFY_WAIT_S` defaults to 60 s for the demo.
+- **The partner (Workstream B) is gone; Aun owns everything.** His packages (TabPFN detector, simulator, runbook search, news check) stay in the repo as experimental code. The running system doesn't call them (decision on 19 Oct: not reliable enough before the deadline).
 - **Laptop quirks:** the Fedora WSL distro is broken (missing disk), Docker Desktop is usually off, and `uv` lives in `%APPDATA%\Python\Python315\Scripts`.
 
 **Do not download large files on the laptop while the Mac model download runs.** Both share the home connection. Small Docker images and the CHR image are fine.

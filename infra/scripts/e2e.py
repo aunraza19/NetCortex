@@ -4,13 +4,15 @@
 
 Injects a scenario on sim-tower, waits for the incident, shows the agent's report and the
 CHR dry run, approves (or rejects), waits for the final status and prints the timeline.
+It approves only after the scenario ends: the simulated recovery starts then, and with a
+short watch (VERIFY_WAIT_S=60) an earlier approval would be judged on incident data.
 Needs the worker, Temporal, CHR and the API running.
 """
 
 import argparse
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -31,7 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", choices=["heavy_user", "uplink_down", "dns_slow"])
     parser.add_argument("--api", default="http://127.0.0.1:8000")
-    parser.add_argument("--duration", type=int, default=5)
+    parser.add_argument("--duration", type=int, default=3)
     parser.add_argument("--reject", action="store_true")
     parser.add_argument("--incident", help="follow this existing incident instead of injecting")
     args = parser.parse_args()
@@ -40,7 +42,7 @@ def main() -> int:
     started = time.monotonic()
     if args.incident:
         incident = api.get(f"/incidents/{args.incident}").json()["incident"]
-        return follow(api, incident["id"], args.reject, started)
+        return follow(api, incident["id"], args.reject, started, None)
     known = {i["id"] for i in api.get("/incidents").json()}
     label = api.post(
         "/demo/scenarios",
@@ -65,10 +67,11 @@ def main() -> int:
     print(
         f"[{time.monotonic() - started:6.1f}s] incident {incident_id} opened: {incident['cause']}"
     )
-    return follow(api, incident_id, args.reject, started)
+    scenario_end = datetime.fromisoformat(label.json()["end_at"])
+    return follow(api, incident_id, args.reject, started, scenario_end)
 
 
-def follow(api: httpx.Client, incident_id: str, reject: bool, started: float) -> int:
+def follow(api: httpx.Client, incident_id: str, reject: bool, started: float, scenario_end) -> int:
 
     detail = wait_for(
         lambda: api.get(f"/incidents/{incident_id}").json(),
@@ -86,6 +89,10 @@ def follow(api: httpx.Client, incident_id: str, reject: bool, started: float) ->
         print("      " + plan["commands"].replace("\n", "\n      "))
 
     if detail["incident"]["status"] == "awaiting_approval":
+        wait_s = 0 if scenario_end is None else (scenario_end - datetime.now(UTC)).total_seconds()
+        if wait_s > 0 and not reject:
+            print(f"    approving after the scenario ends ({wait_s:.0f} s)")
+            time.sleep(wait_s + 5)
         action = "reject" if reject else "approve"
         reply = api.post(f"/incidents/{incident_id}/{action}", json={"decided_by": "e2e-script"})
         print(f"[{time.monotonic() - started:6.1f}s] {action}: HTTP {reply.status_code}")

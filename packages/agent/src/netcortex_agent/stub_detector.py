@@ -1,5 +1,5 @@
-"""Rule-based stand-in for packages/detector (TabPFN) until it merges. Same interface:
-detect(site_id, window, history) -> DetectionResult, with mode="mock".
+"""The rule-based detector, the only one the runtime uses. Same interface as the partner's
+experimental TabPFN detector: detect(site_id, window, history) -> DetectionResult, mode="mock".
 
 It compares the last 3 minutes with the rest of the window and history, and checks the
 rules in order: uplink down, DNS slow, heavy user, uplink congestion, upstream degradation.
