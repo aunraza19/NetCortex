@@ -50,6 +50,18 @@ class Settings(BaseSettings):
 
     # Live collector
     site_id_live: str = "home-lab"
+    collector_interval_s: float = Field(default=10.0, gt=0)
+    collector_pings: int = Field(default=5, ge=1)  # pings (and DNS lookups) per target per round
+    collector_ping_timeout_s: float = Field(default=1.0, gt=0)
+    collector_gateway: str | None = None  # default: hop 1 of a traceroute at startup
+    collector_upstream_hop: str | None = None  # default: hop 2 of that traceroute
+    collector_public_targets: list[str] = ["1.1.1.1", "8.8.8.8"]
+    collector_game_server: str | None = None  # one regional game server to ping
+    collector_dns_resolvers: list[str] = ["1.1.1.1", "8.8.8.8"]  # stored as dns:<resolver>
+    collector_dns_query: str = "google.com"
+    collector_dns_timeout_s: float = Field(default=2.0, gt=0)
+    collector_router_stats: bool = False  # read interface/queue stats from CHR_REST_URL
+    collector_router_interval_s: float = Field(default=30.0, gt=0)
 
 
 @lru_cache
