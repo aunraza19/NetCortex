@@ -4,6 +4,7 @@ so a worker crash mid-investigation resumes where it stopped instead of starting
 from datetime import timedelta
 
 from netcortex_agent.agent import MODEL_TIMEOUT_S, build_model, incident_agent, model_settings
+from netcortex_agent.tracing import SentryModel
 from netcortex_core import get_settings
 from pydantic_ai.durable_exec.temporal import TemporalAgent
 from temporalio.common import RetryPolicy
@@ -11,7 +12,8 @@ from temporalio.workflow import ActivityConfig
 
 # The wrapped agent must have a model of its own; TemporalAgent turns calls to it into
 # activities. (Outside the worker, run_investigation passes its model explicitly.)
-incident_agent.model = build_model(get_settings())
+# SentryModel makes each of those model_request activities report a gen_ai.chat span.
+incident_agent.model = SentryModel(build_model(get_settings()), agent_name=incident_agent.name)
 
 temporal_agent = TemporalAgent(
     incident_agent,
