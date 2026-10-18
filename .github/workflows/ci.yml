@@ -23,9 +23,11 @@ jobs:
       - name: Install every workspace package
         run: uv sync --all-packages --locked
       - name: Ruff
-        run: uv run --locked ruff check .
+        run: uv run --locked ruff check . .github/scripts .github/tests
       - name: Pytest
-        run: uv run --locked pytest --cov --cov-report=term-missing
+        run: |
+          uv run --locked pytest packages .github/tests \
+            --cov --cov-report=term-missing
 
   web:
     name: Web lint, typecheck, build, and browser tests
@@ -39,37 +41,43 @@ jobs:
         shell: bash
         run: |
           if [[ ! -f apps/web/package.json ]]; then
-            echo "Web app not present yet; web checks are pending."
+            echo "## Web validation pending" >> "$GITHUB_STEP_SUMMARY"
+            echo "Web checks pending." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if [[ ! -f apps/web/package-lock.json ]]; then
-            echo "apps/web/package-lock.json is required for reproducible CI." >&2
+            echo "Web lockfile required for reproducible CI." >&2
             exit 1
           fi
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const p = JSON.parse(
+            fs.readFileSync('apps/web/package.json', 'utf8')
+          );
+          for (const script of ['lint', 'typecheck', 'build', 'test:e2e', 'test:e2e:live']) {
+            if (!p.scripts?.[script]) {
+              throw new Error(`Missing required npm script: ${script}`);
+            }
+          }
+          const configs = [
+            'playwright.config.ts', 'playwright.config.js',
+            'playwright.config.mts', 'playwright.config.mjs',
+            'playwright.config.cjs'
+          ];
+          if (!configs.some(name => fs.existsSync(`apps/web/${name}`))) {
+            throw new Error('Playwright config is required for web CI');
+          }
+          if (!p.devDependencies?.['@playwright/test'] &&
+              !p.dependencies?.['@playwright/test']) {
+            throw new Error('@playwright/test must be declared');
+          }
+          NODE
           cd apps/web
           npm ci
+          npm run format:check
           npm run lint
           npm run typecheck
           npm run build
-          if [[ -f playwright.config.ts || -f playwright.config.js || -f playwright.config.mts ]]; then
-            npx playwright install --with-deps chromium
-            npx playwright test
-          else
-            echo "Playwright configuration not present yet; browser checks are pending."
-          fi
-
-  chr-templates:
-    name: CHR router template integration
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - name: Run Aun's real CHR harness when available
-        shell: bash
-        run: |
-          if [[ ! -f infra/chr/test_templates.py ]]; then
-            echo "PENDING: infra/chr/test_templates.py is not present. No router tests were run."
-            exit 0
-          fi
-          uv sync --all-packages --locked
-          uv run --locked python infra/chr/test_templates.py
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+          npm run test:e2e:live

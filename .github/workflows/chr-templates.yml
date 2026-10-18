@@ -1,0 +1,120 @@
+name: CHR template integration
+
+on:
+  push:
+    branches: ["b/**"]
+    paths:
+      - "packages/**"
+      - "templates/routeros/**"
+      - "infra/chr/**"
+      - ".github/scripts/chr_bootstrap.py"
+      - ".github/workflows/chr-templates.yml"
+  pull_request:
+    paths:
+      - "packages/**"
+      - "templates/routeros/**"
+      - "infra/chr/test_templates.py"
+      - "infra/chr/**"
+      - ".github/scripts/chr_bootstrap.py"
+      - ".github/workflows/chr-templates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.contract.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Aun's router harness contract
+        id: contract
+        shell: bash
+        run: |
+          if [[ -f infra/chr/test_templates.py ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "## Router validation pending" >> "$GITHUB_STEP_SUMMARY"
+            echo "Aun harness missing." >> "$GITHUB_STEP_SUMMARY"
+            echo "Router templates were not tested." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  chr-smoke:
+    name: CHR boot and authenticated REST smoke
+    needs: readiness
+    if: needs.readiness.outputs.ready != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils
+      - name: Install locked workspace
+        run: uv sync --all-packages --locked
+      - name: Test lifecycle helper with offline fakes
+        run: uv run --locked pytest .github/tests/test_chr_bootstrap.py
+      - name: Boot CHR and verify authenticated REST readiness
+        run: uv run --locked python .github/scripts/chr_bootstrap.py start
+      - name: Record actual CHR smoke and pending template coverage
+        run: |
+          echo "## CHR bootstrap smoke passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "CHR boot and REST check passed." >> "$GITHUB_STEP_SUMMARY"
+          echo "No templates were tested." >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep router diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chr-smoke-diagnostics
+          path: |
+            /tmp/netcortex-chr/qemu.log
+            /tmp/netcortex-chr/serial.log
+          if-no-files-found: ignore
+      - name: Stop the isolated router
+        if: always()
+        run: python .github/scripts/chr_bootstrap.py cleanup
+
+  templates:
+    name: Apply, read back, and roll back on CHR
+    needs: readiness
+    if: needs.readiness.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils
+      - name: Install locked workspace
+        run: uv sync --all-packages --locked
+      - name: Offline test bootstrap lifecycle helpers
+        run: uv run --locked pytest .github/tests/test_chr_bootstrap.py
+      - name: Boot, provision, and authenticate to pinned CHR
+        run: uv run --locked python .github/scripts/chr_bootstrap.py start
+      - name: Run Aun's real router template harness
+        run: uv run --locked python infra/chr/test_templates.py
+      - name: Keep router diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chr-diagnostics
+          path: |
+            /tmp/netcortex-chr/qemu.log
+            /tmp/netcortex-chr/serial.log
+          if-no-files-found: ignore
+      - name: Stop the isolated router
+        if: always()
+        run: python .github/scripts/chr_bootstrap.py cleanup
