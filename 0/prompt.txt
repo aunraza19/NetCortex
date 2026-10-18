@@ -1,0 +1,54 @@
+<task-notification>
+<task-id>bcws2ir78</task-id>
+<summary>Monitor event: "heavy_user e2e progress and worker errors"</summary>
+<event>2026-10-18 23:14:27,951 WARNING temporalio.workflow investigation failed, using template none: `model` must either be set on the agent or included when calling it. (Even when `override(model=...)` is customizing the model that will actually be called) ({'attempt': 1, 'namespace': 'default', 'run_id': '01a15038-e304-70db-becc-10d0a1417243', 'task_queue': 'netcortex', 'workflow_id': 'incident-52334da2-d2c8-403d-800c-1e8d57fdeab4', 'workflow_type': 'IncidentWorkflow'})</event>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bv8u1ltet</task-id>
+<tool-use-id>toolu_01L7tqjHGbFDx5p6FXunJa5f</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bv8u1ltet.output</output-file>
+<status>completed</status>
+<summary>Background command "E2E run: heavy_user" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bcws2ir78</task-id>
+<summary>Monitor event: "heavy_user e2e progress and worker errors"</summary>
+<event>[   0.0s] injected heavy_user on sim-tower
+[  33.8s] incident 52334da2-d2c8-403d-800c-1e8d57fdeab4 opened: heavy_user
+[  34.7s] status awaiting_approval
+[  35.7s] approve: HTTP 202
+[  47.6s] final status: resolved
+exit=0</event>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bcws2ir78</task-id>
+<summary>Monitor event: "heavy_user e2e progress and worker errors"</summary>
+<event>2026-10-18 23:15:32,302 ERROR temporalio.worker._workflow Failed handling activation on workflow with run ID 01a15039-de67-71aa-be99-2ff2d5fd4f50
+Traceback (most recent call last):
+ImportError: cannot import name 'GEMMA' from 'netcortex_worker.durable' (C:\Users\hp\NetCortex\services\worker\src\netcortex_worker\durable.py)
+[2m2026-10-18T18:15:32.467775Z[0m [33m WARN[0m [2mtemporalio_sdk_core::worker::workflow[0m[2m:[0m Failing workflow task [3mrun_id[0m[2m=[0m01a15039-de67-71aa-be99-2ff2d5fd4f50 [3mfailure[0m[2m=[0mFailure { failure: Some(Failure { message: "cannot import name 'GEMMA' from 'netcortex_worker.durable' (C:\\Users\\hp\\NetCortex\\services\\worker\\src\\netcortex_worker\\durable.py)", source: "", stack_trace: "  File \"C:\\Users\\hp\\NetCortex\\.venv\\Lib\\site-packages\\temporalio\\wor...(truncated)
+2026-10-18 23:15:32,511 ERROR temporalio.worker._workflow Failed handling activation on workflow with run ID 01a15039-de67-71aa-be99-2ff2d5fd4f50
+Traceback (most recent call last):
+ImportError: cannot import name 'GEMMA' from 'netcortex_worker.durable' (C:\Users\hp\NetCortex\services\worker\src\netcortex_worker\durable.py)</event>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bpsfqcclc</task-id>
+<summary>Monitor event: "worker warnings/errors after model fix"</summary>
+<event>2026-10-18 23:17:35,439 ERROR temporalio.worker._workflow_instance _ChildWorkflowHandle exception was never retrieved
+future: &lt;_ChildWorkflowHandle finished name='child: IncidentWorkflow (workflow: MonitorSiteWorkflow, id: monitor-sim-tower, run: 01a15037-dd55-7c0d-a500-d60282da7839)' coro=&lt;_WorkflowInstanceImpl._outbound_start_child_workflow.&lt;locals&gt;.run_child() done, defined at C:\Users\hp\NetCortex\.venv\Lib\site-packages\temporalio\worker\_workflow_instance.py:2197&gt; exception=ChildWorkflowError('Child Workflow execution terminated')&gt;
+temporalio.exceptions.TerminatedError: Terminated
+Traceback (most recent call last):
+temporalio.exceptions.ChildWorkflowError: Child Workflow execution terminated</event>
+</task-notification>
