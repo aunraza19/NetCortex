@@ -60,7 +60,7 @@ def main() -> int:
         matching = [i for i in found if i["cause"] == args.scenario]
         return (matching or found or [None])[0]
 
-    incident = wait_for(new_incident, bool, timeout_s=300)
+    incident = wait_for(new_incident, bool, timeout_s=600)  # cooldown after the last run: 4 min
     incident_id = incident["id"]
     print(
         f"[{time.monotonic() - started:6.1f}s] incident {incident_id} opened: {incident['cause']}"
