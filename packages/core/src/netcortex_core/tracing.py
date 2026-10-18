@@ -19,7 +19,6 @@ def init_sentry(service: str, settings: Settings | None = None) -> bool:
     sentry_sdk.init(
         dsn=settings.sentry_dsn_backend,
         traces_sample_rate=1.0,
-        send_default_pii=False,
         environment="demo" if settings.demo_mode else "dev",
         server_name=service,
         integrations=[PydanticAIIntegration()],
