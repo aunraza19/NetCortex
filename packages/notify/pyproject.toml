@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netcortex-notify"
+version = "0.1.0"
+description = "Voice alerts and upstream outage checks for NetCortex"
+requires-python = ">=3.12,<3.13"
+dependencies = ["httpx>=0.27,<1"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+notify = "netcortex_notify.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netcortex_notify"]
