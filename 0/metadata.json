@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M5843JWH1TWVH92VKGQ8XZWC",
+  "session_id": "88958964-2992-40b7-a2b1-a4d7674680fc",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T18:24:13.9951707Z",
+  "branch": "a/runtime",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "CLAUDE.md",
+    "services/api/README.md",
+    "services/api/src/netcortex_api/snapshot.py",
+    "services/worker/README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "9e3b35a95599",
+  "checkpoint_transcript_start": 3762,
+  "transcript_lines_at_start": 3762,
+  "compact_transcript_start": 297,
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 8607,
+    "cache_read_tokens": 5065258,
+    "output_tokens": 6149,
+    "api_call_count": 8
+  },
+  "session_metrics": {
+    "turn_count": 11
+  }
+}
