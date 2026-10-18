@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetCortex</title>
+  <link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>NetCortex</h1>
+    <ul id="sites" class="sites" aria-label="Site health"></ul>
+    <span id="live" class="live">CONNECTING</span>
+  </header>
+
+  <main class="layout">
+    <section class="side">
+      <section class="block">
+        <h2>Simulate incident</h2>
+        <form id="simulate">
+          <label>Site
+            <select name="site_id" id="sim-site"><option>sim-tower</option></select>
+          </label>
+          <fieldset>
+            <legend>Scenario</legend>
+            <label><input type="radio" name="scenario_type" value="heavy_user" checked> Heavy user</label>
+            <label><input type="radio" name="scenario_type" value="uplink_down"> Uplink down</label>
+            <label><input type="radio" name="scenario_type" value="dns_slow"> Slow DNS</label>
+          </fieldset>
+          <label>Duration (minutes)
+            <input type="number" name="duration_min" value="5" min="1" max="60">
+          </label>
+          <button type="submit">Inject</button>
+          <p id="sim-note" class="note" role="status"></p>
+        </form>
+      </section>
+
+      <section class="block">
+        <h2>Incidents</h2>
+        <ol id="incidents" class="incidents"></ol>
+      </section>
+    </section>
+
+    <section id="detail" class="detail block" aria-live="polite">
+      <p class="note">Select an incident.</p>
+    </section>
+  </main>
+
+  <script src="/ui/app.js"></script>
+</body>
+</html>

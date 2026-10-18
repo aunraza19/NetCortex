@@ -78,3 +78,11 @@ def test_site_health_rules():
     assert health_of([("1.1.1.1", None, 100.0), ("10.0.0.1", 2.0, 0.0)], 1) == "down"
     assert health_of([("1.1.1.1", 20.0, 0.0)], 1) == "degraded"
     assert health_of([("1.1.1.1", 20.0, 0.0)], 0) == "ok"
+
+
+def test_dashboard_is_served_at_the_root(client):
+    page = client.get("/")
+    assert page.status_code == 200 and "<title>NetCortex</title>" in page.text
+    for asset in ("/ui/style.css", "/ui/app.js"):
+        assert client.get(asset).status_code == 200
+    assert "/" not in client.get("/openapi.json").json()["paths"]
