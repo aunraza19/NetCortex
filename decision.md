@@ -18,14 +18,22 @@ how the pieces connect and [the implementation plan](docs/WORKSTREAM_B_PLAN.md).
 | Use Render Node hosting for the Next.js dashboard | SSR routes and dynamic incident URLs require the actual Next server | Static `dist` hosting is unsuitable for this application |
 | Keep the API deployment gated on Aun's backend | Creating a second backend would break ownership and integration | Infrastructure docs may be ready before a public complete demo |
 | Use free tiers and credits only | User's chosen spending limit | Any purchase or paid upgrade needs separate authorization |
+| Add the MIT license specified in Aun's brief | The challenge plan explicitly requires MIT-licensed project code | Third-party model/data licenses still apply separately |
 | Enable Entire before the first implementation commit | Capture coding provenance required by the brief | Hook installation is verified separately from transcript/checkpoint capture |
 | Git author is `techieworld2` with the email the user supplied | User explicitly provided their commit identity | Repository-local identity; unrelated repositories are unchanged |
+| Bind GitHub Git operations to `techieworld2` in Credential Manager | This machine has multiple stored accounts | Verified repo push/workflow permission without printing or committing tokens |
 | Persist decisions, flow documentation and progress handoffs | User wants to understand the code and context must survive compaction | Every package/app has both documents; lead keeps these root documents current |
+| Normalize tracked text to LF | The team develops on Windows and macOS and tests on Linux | Git whitespace checks and generated diffs behave consistently |
 | Do not promise exact 60% compaction in this running session | Exposed agent controls do not set or trigger that threshold | Host compaction remains automatic; handoffs preserve state independently |
+| Require explicit opt-in for RIPE role transfer | Measured root-server routes differ from configured DNS destinations | Transfer can affect public DNS ping baselines only; provenance and uncertainty travel with generated data |
+| Validate quantile layout, forecast time and freshness independently | SDK array shape and future rows can silently corrupt an otherwise plausible forecast | Regression tests cover each horizon, physical bounds, mixed sources and gaps |
+| Treat live decision POST responses as acknowledgements | A workflow can still be applying or rolling back after the HTTP request succeeds | Fetch authoritative incident state and follow SSE updates |
+| Separate CHR boot smoke from template validation | A real router can boot even while Aun's template harness is absent | CI reports those outcomes separately; no fabricated template pass |
+| Keep the unpatched braces advisory documented | npm proposes an incompatible Next lint downgrade and no patched braces release exists | Production audit is clean; five development audit entries share one advisory |
 
 ## Current external gates
 
-As initially inspected, upstream main contains only README.md. Aun must publish
+At the final integration refresh, upstream main still contains only README.md. Aun must publish
 core/backend contracts. Database, tailnet, API keys, Sentry projects, Render and
 domain access are not yet supplied. Their live checks remain pending until
 verified; none are replaced with invented pass results.

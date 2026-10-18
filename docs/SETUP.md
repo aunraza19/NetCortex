@@ -5,14 +5,14 @@
 Install Python 3.12, uv, Node.js/npm for the web app, and Git. From the repository root:
 
 ```powershell
-uv sync --all-packages
+uv sync --all-packages --locked
 uv run ruff check .
 uv run pytest
 ```
 
-`uv sync --all-packages` installs each workspace member in editable mode so tests import the installed packages. The workspace package directories are being created in parallel; run sync after they exist. The root does not own `uv.lock`; the workstream lead generates and commits it once all package manifests are present.
+`uv sync --all-packages --locked` installs all four workspace packages in editable mode from the committed lockfile. The lead maintains the root manifest and lockfile. Optional TabPFN/cloud/local extras are excluded from this base installation.
 
-For the web app, once `apps/web/package-lock.json` exists:
+For the web app:
 
 ```powershell
 cd apps/web
@@ -20,7 +20,8 @@ npm ci
 npm run lint
 npm run typecheck
 npm run build
-npx playwright test
+npm run test:e2e
+npm run test:e2e:live
 ```
 
 Playwright browser setup may also require `npx playwright install --with-deps` on Linux CI.
@@ -41,4 +42,22 @@ The hosted demo may use Render, Tiger Data, Sentry, and vendor trial/free credit
 
 ## Integration gates
 
-The core package name and shared schemas, Settings, API and SSE contract, role mapping, and CHR harness are awaiting Aun's confirmation. See [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md). The Render blueprint currently describes only the static web app; an API service must not be added until Aun's backend exists and its deployment contract is known.
+The core package name and shared schemas, Settings, API and SSE contract, role mapping, and CHR harness are awaiting Aun's confirmation. See [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md). The Render blueprint describes the Next.js Node web service; an API service must not be added until Aun's backend exists and its deployment contract is known.
+
+## Agent add-ons configured on this workstation
+
+- RouterOS QEMU and Sentry instrumentation skills were installed from their
+  official source repositories. They were read and applied to the corresponding implementation.
+- TabPFN MCP is configured at `https://api.priorlabs.ai/mcp/server`, using the
+  local `TABPFN_API_KEY` environment variable. No key is supplied yet, so the
+  connection has not been verified. The runtime Python client maps this same
+  setting through its supported token API.
+- Tiger CLI is installed. Its MCP uses `tiger mcp start` and requires Tiger
+  authentication plus Aun's database access. Do not call it connected until a
+  real authenticated query succeeds.
+- Entire is enabled locally with telemetry and automatic session uploads
+  disabled. Publishing selected coding-session provenance remains a separate,
+  deliberate action after reviewing what the captured session includes.
+
+Do not paste secrets into code, commit messages, documentation or chat. Use local
+environment configuration and each provider's authentication flow.

@@ -21,6 +21,14 @@ These are proposals and integration questions only. They do not change shared co
 - Confirm SSE endpoint, event envelope, event IDs/replay behavior, heartbeat cadence, reconnect expectations, and event names/payloads (`incident.opened`, `fix.tested`, and others).
 - Specify whether subscriber identifiers/IPs are exposed, redacted, or role-gated in API events and the UI; identify retention and access policy.
 - Clarify how a subscriber can be identified for heavy-user analysis without exposing unnecessary personal data.
+- Extend MetricsWindow/storage with observed per-subscriber traffic and IP identity;
+  aggregate interface counters cannot identify an offending user. Supplemental
+  simulator fixtures are experimental until this contract is approved.
+- Add explicit DNS resolution duration/outcome observations; ICMP RTT to a DNS
+  server is not a DNS lookup measurement.
+- Publish target roles and interface/backhaul mapping, uplink capacities and
+  configured backup gateways so causes and fix parameters derive from observations.
+- Define Settings read/update API endpoints before enabling editable UI Settings.
 
 ## Timing and role mapping
 

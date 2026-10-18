@@ -39,7 +39,7 @@ flowchart TD
 | Entry | Inputs | Connection / processing | Exit |
 | --- | --- | --- | --- |
 | `simgen ripe` | requested days, cache location | Discover PK probes/measurements; bounded RIPE downloads | Local raw dataset with source provenance; error on unavailable API |
-| `simgen calibrate` | real baseline rows | Group baseline statistics by target role and local hour | Calibration file with coverage/default status |
+| `simgen calibrate` | real baseline rows, optional exact target-role map and explicit proxy opt-in | Group statistics by target and Pakistan hour; restrict proxy transfer to public DNS ping roles | Calibration/report with coverage, defaults, source targets and transfer uncertainty |
 | `simgen generate` | days, seed, scenario configuration | Seeded demand/noise and incident transforms | Probe/interface Parquet plus separate expected labels |
 | `simgen replay` / `inject` | site, cause, duration, seed | Active simulator runtime; DB writes need Aun's keys/runtime agreement | Current metrics and scenario label; explicit missing-runtime/contract failure |
 | `detect(site_id, window, history)` | observed shared MetricsWindow | Lag features -> TabPFN forecasts/anomaly/cause | Shared DetectionResult and approved forecast writes, or unavailable error |
@@ -47,7 +47,7 @@ flowchart TD
 | `speak(text, lang)` | short text, en/ur | ElevenLabs with finite deadlines | MP3 bytes; empty bytes when audio unavailable |
 | `check_news(provider, target)` | upstream provider/target | Recent SerpApi search | Shared NewsCheck with links; explicit unavailable summary on failure |
 | Dashboard navigation | site/incident selection | Fixture transport or Aun's HTTP API | Rendered status/evidence, loading state or visible error |
-| Dashboard decision | confirmed approve/reject | POST to Aun; workflow owns subsequent state | Acknowledged decision, followed by SSE/refetch; no assumed live success |
+| Dashboard decision | confirmed approve/reject | POST to Aun; GET authoritative incident after acknowledgement; workflow owns subsequent state | Acknowledged decision, followed by SSE/refetch; no assumed live success |
 | Evaluation runner | held-out case directory and mode | Detector, then Aun's agent/checker when available | Markdown/structured results with actual measurements and pending gates |
 
 ## HTTP boundary owned by Aun
@@ -73,6 +73,7 @@ passing CHR check and an appropriate incident state.
 Render runs the dashboard's Node/Next.js server. Aun supplies the API service;
 the browser does not hold database or provider secrets. Sentry receives optional
 frontend monitoring when configured. CI checks offline Python/frontend behavior;
-the separate CHR workflow can establish router validity only when Aun's actual
-boot/test harness runs successfully. External authentication is setup, not an
-automatic claim of a working connection.
+the separate CHR workflow boots a pinned router and checks authenticated REST.
+Its template job runs only when Aun's actual test harness exists; boot success
+alone does not establish template validity. External authentication is setup,
+not an automatic claim of a working connection.
