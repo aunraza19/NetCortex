@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M57WC1Y5DVE0ASCBQF9BKB3T",
+  "strategy": "manual-commit",
+  "branch": "a/agent",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "packages/agent/src/netcortex_agent/agent.py",
+    "packages/agent/src/netcortex_agent/cases.py",
+    "packages/agent/src/netcortex_agent/facts.py",
+    "packages/agent/src/netcortex_agent/modules.py",
+    "packages/agent/src/netcortex_agent/stubs.py",
+    "packages/agent/tests/test_agent.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
