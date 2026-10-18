@@ -1,0 +1,22 @@
+<pasted_content id="5505">
+Decision: the voice feature (ElevenLabs) is dropped from the project.
+After the a/agent work is pushed, create branch a/drop-voice from main and remove it:
+
+- packages/core: remove the Speak protocol, the elevenlabs_* settings and any voice
+  helpers. Remove the ELEVENLABS_* lines from .env.example.
+- Database: do NOT edit 001_init. Add migration 002 that runs
+  DROP TABLE IF EXISTS incident_audio. It must be safe to re-run.
+- Remove any voice-related schema fields, tests and docs in Workstream A folders.
+- CLAUDE.md: remove the speak() step from IncidentWorkflow (A8) and the
+  /incidents/{id}/voice endpoint (A9), and drop ElevenLabs from the partner table.
+- Keep customer_message_en and customer_message_ur in IncidentReport. Text messages stay.
+- Keep check_news (SerpApi). Only voice is removed.
+- Don't touch Workstream B folders.
+
+Run all tests and ruff, push, give me the compare URL, and list exactly what was removed.
+I'll run netcortex-migrate myself.
+</pasted_content id="5505">
+
+Also, in the same branch: in packages/fixes, make queue_limit reject a max-limit that is
+not clearly below the subscriber's current rate (e.g. at most 50% of it), with a clear
+error message, so the retry teaches Gemma.
