@@ -19,9 +19,9 @@ params:
 # A new simple queue is added at the end of the list. On routers that already have one
 # queue per subscriber, it must be moved above that subscriber's queue to take effect.
 apply: |
-  /queue simple add name="netcortex-limit-{{ target | replace('/', '_') }}" target={{ target }} max-limit={{ upload_mbps }}M/{{ download_mbps }}M comment="netcortex:queue_limit"
+  /queue simple add name="{{ tag }}-limit-{{ target | replace('/', '_') }}" target={{ target }} max-limit={{ upload_mbps }}M/{{ download_mbps }}M comment="{{ tag }}:queue_limit"
 rollback: |
-  /queue simple remove [find name="netcortex-limit-{{ target | replace('/', '_') }}"]
+  /queue simple remove [find name="{{ tag }}-limit-{{ target | replace('/', '_') }}"]
 # The cap must be at most 50% of the subscriber's current rate in its busier direction.
 checks: [cap_below_current_rate]
 verify:

@@ -20,9 +20,9 @@ params:
 # route had no check-gateway before.
 apply: |
   /ip route set [find dst-address="0.0.0.0/0" gateway="{{ primary_gateway }}"] check-gateway=ping
-  /ip route add dst-address=0.0.0.0/0 gateway={{ backup_gateway }} distance={{ backup_distance }} check-gateway=ping comment="netcortex:failover_route"
+  /ip route add dst-address=0.0.0.0/0 gateway={{ backup_gateway }} distance={{ backup_distance }} check-gateway=ping comment="{{ tag }}:failover_route"
 rollback: |
-  /ip route remove [find comment="netcortex:failover_route"]
+  /ip route remove [find comment="{{ tag }}:failover_route"]
   /ip route unset [find dst-address="0.0.0.0/0" gateway="{{ primary_gateway }}"] check-gateway
 verify:
   metric: loss_pct

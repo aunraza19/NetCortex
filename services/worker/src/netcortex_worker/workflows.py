@@ -16,6 +16,7 @@ from temporalio.exceptions import ActivityError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
+    import netcortex_fixes as fixes
     from netcortex_agent import facts
     from netcortex_agent.agent import Deps, fallback_report, with_news
     from netcortex_core import DetectionResult, FixPlan, IncidentReport, IncidentStatus, TemplateId
@@ -169,7 +170,10 @@ class IncidentWorkflow(PydanticAIWorkflow):
             except ActivityError as exc:
                 workflow.logger.warning("dry run could not run: %s", exc)
             if plan is None or not plan.dry_run_ok:
-                await self._status(inp, IncidentStatus.REJECTED, "fix did not pass its CHR dry run")
+                reason = fixes.failure_reason(plan) if plan else "it could not run"
+                await self._status(
+                    inp, IncidentStatus.REJECTED, f"fix did not pass its CHR dry run: {reason}"
+                )
                 return self.status.value
 
         # 3. Wait for the owner.
@@ -205,8 +209,8 @@ class IncidentWorkflow(PydanticAIWorkflow):
                 start_to_close_timeout=timedelta(seconds=120),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-        except ActivityError as exc:
-            await self._rollback(inp, approved, f"apply failed: {exc.cause or exc}")
+        except ActivityError as exc:  # apply() already undid whatever part of it went in
+            await self._status(inp, IncidentStatus.ROLLED_BACK, f"apply failed: {exc.cause or exc}")
             return self.status.value
         await self._status(
             inp, IncidentStatus.VERIFYING, f"watching for {inp.timing.verify_wait_s:.0f} s"

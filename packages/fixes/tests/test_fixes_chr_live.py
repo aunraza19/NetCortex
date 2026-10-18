@@ -39,7 +39,7 @@ def test_approved_fix_applies_and_rolls_back_on_chr(chr_router):
     )
     try:
         apply(plan, chr_router)
-        assert any("netcortex-limit-10.0.0.42" in line for line in chr_router.export())
+        assert any("nc-test-limit-10.0.0.42" in line for line in chr_router.export())
     finally:
         rollback(plan, chr_router)
     assert chr_router.export() == before

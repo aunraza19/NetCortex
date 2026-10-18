@@ -10,6 +10,7 @@ import re
 from functools import cache
 from pathlib import Path
 from typing import Any, Literal
+from uuid import UUID
 
 import yaml
 from jinja2 import StrictUndefined
@@ -179,10 +180,26 @@ def validate(
     return clean
 
 
-def render(template_id: TemplateId | str, params: dict[str, Any]) -> tuple[str, str]:
-    """(apply commands, rollback commands) for validated params."""
+TEST_TAG = "nc-test"  # for checks outside an incident (unit tests, the CHR harness)
+
+
+def tag_for(incident_id: UUID) -> str:
+    """The name prefix of every router object one incident's fix creates: nc-1a2b3c4d."""
+    return f"nc-{str(incident_id)[:8]}"
+
+
+def render(
+    template_id: TemplateId | str, params: dict[str, Any], tag: str = TEST_TAG
+) -> tuple[str, str]:
+    """(apply commands, rollback commands) for validated params.
+
+    Objects the fix creates are named after `tag`, and the rollback removes only those, so
+    fixes for different incidents never collide or remove each other's (or anyone's) config.
+    """
+    if not re.fullmatch(r"nc-[0-9a-z]+", tag):
+        raise ParamError(f"bad tag {tag!r}")
     template = get_template(template_id)
     clean = validate(template.id, params)
-    apply = _jinja.from_string(template.apply).render(**clean).strip()
-    rollback = _jinja.from_string(template.rollback).render(**clean).strip()
+    apply = _jinja.from_string(template.apply).render(**clean, tag=tag).strip()
+    rollback = _jinja.from_string(template.rollback).render(**clean, tag=tag).strip()
     return apply, rollback
