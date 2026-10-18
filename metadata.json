@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M58BMZ3NJMDRWHPT2696MRZH",
+  "strategy": "manual-commit",
+  "branch": "a/demo-hardening",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "packages/agent/scripts/reliability.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 12750,
+    "cache_read_tokens": 2204845,
+    "output_tokens": 5621,
+    "api_call_count": 7
+  }
+}
