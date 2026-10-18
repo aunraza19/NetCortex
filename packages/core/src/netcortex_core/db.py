@@ -23,6 +23,7 @@ from netcortex_core.schemas import (
     SUBSCRIBER_COLUMNS,
     DetectionResult,
     EventKind,
+    FixPlan,
     IfaceMetric,
     Incident,
     IncidentStatus,
@@ -178,3 +179,8 @@ def fetch_site(conn: Connection, site_id: str) -> Site | None:
         return None
     site_id, name, uplinks, targets, subscribers = row
     return Site(id=site_id, name=name, uplinks=uplinks, targets=targets, subscribers=subscribers)
+
+
+def insert_fix_plan(conn: Connection, plan: FixPlan) -> UUID:
+    _insert_many(conn, "fix_plans", tuple(FixPlan.model_fields), [plan])
+    return plan.id
