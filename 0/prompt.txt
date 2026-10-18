@@ -1,0 +1,27 @@
+<task-notification>
+<task-id>b3ci94mq6</task-id>
+<tool-use-id>toolu_01GiLU5uaCmnFVe3bSYCG2dh</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\b3ci94mq6.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the Temporal worker on a/ui" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>buoqur6b1</task-id>
+<tool-use-id>toolu_011hqQrLnGYQcWK6rEkEvqqw</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\buoqur6b1.output</output-file>
+<status>failed</status>
+<summary>Background command "Start the FastAPI server with the dashboard" failed with exit code 127</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bbpyy792u</task-id>
+<tool-use-id>toolu_01BPcRscvzza8WGDb7sKYFTs</tool-use-id>
+<output-file>C:\Users\hp\AppData\Local\Temp\claude\c--Users-hp-NetCortex\88958964-2992-40b7-a2b1-a4d7674680fc\tasks\bbpyy792u.output</output-file>
+<status>completed</status>
+<summary>Background command "Run heavy_user e2e with 2 min scenario, 60 s watch" completed (exit code 0)</summary>
+</task-notification>
