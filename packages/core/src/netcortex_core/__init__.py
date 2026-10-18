@@ -7,7 +7,6 @@ from netcortex_core.interfaces import (
     Investigate,
     ModuleUnavailable,
     SearchRunbook,
-    Speak,
     conforms,
 )
 from netcortex_core.schemas import (
@@ -81,7 +80,6 @@ __all__ = [
     "Settings",
     "Site",
     "Source",
-    "Speak",
     "SubscriberMetric",
     "TargetRole",
     "TemplateId",

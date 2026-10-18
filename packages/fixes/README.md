@@ -7,8 +7,8 @@ commands.
 ```python
 import netcortex_fixes as fixes
 
-fixes.templates_for("heavy_user")      # [queue_limit, none]
-fixes.validate("queue_limit", params)  # normalised params, or raises ParamError
+fixes.templates_for("heavy_user")  # [queue_limit, none]
+fixes.validate("queue_limit", params, observed)  # normalised params, or ParamError
 apply, rollback = fixes.render("queue_limit", params)
 ```
 
@@ -35,6 +35,13 @@ Each file has `id`, `description`, `allowed_causes`, typed `params`, `apply` and
 - Unknown or missing params are rejected.
 - Rendering uses a sandboxed Jinja environment with `StrictUndefined`, so only validated
   values reach the commands.
+- Templates can name **checks** against live observations (`checks.py`). These run when
+  the caller passes `observed=`.
+  - `queue_limit` uses `cap_below_current_rate`: in the subscriber's busier direction, the
+    cap must be at most 50% of its current rate.
+  - A subscriber using under 2 Mbit/s can't be capped at all.
+  - The error names the allowed maximum (for example "at most 67"), so the agent's retry
+    can fix it.
 - Params marked `set_by: router` (for example `dns_servers.previous_servers`) are filled in
   by the fix checker from the router, never by the agent.
 

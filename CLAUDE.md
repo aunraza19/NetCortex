@@ -67,7 +67,7 @@ If a partner module is not merged yet, put a stub with the **same interface** in
 2. **`settings.py`**: one `Settings` class (pydantic-settings) for every env var in plan §8. Add:
    - `APPLY_TARGET` (`chr` by default; `real` must be set explicitly)
    - `SITE_ID_LIVE` (default `home-lab`)
-3. **`interfaces.py`**: `Protocol`s for `detect`, `search_runbook`, `speak`, `check_news`, `inject`, `investigate`, with signatures exactly as in plan §8.
+3. **`interfaces.py`**: `Protocol`s for `detect`, `search_runbook`, `check_news`, `inject`, `investigate`, with signatures exactly as in plan §8. (`speak` was removed with the voice feature.)
 4. **`db.py`**: psycopg 3 connection pool and small helpers to insert metrics and incidents.
 5. **`migrations/001_init.sql`**:
    - Enable the extensions `timescaledb` and `vector`.
@@ -75,7 +75,7 @@ If a partner module is not merged yet, put a stub with the **same interface** in
    - Make `probe_metrics`, `iface_metrics` and `forecasts` hypertables.
    - Add indexes on `(site_id, time DESC)`.
 6. **Additions beyond the plan** (Aun owns contracts, so add them now and tell the partner):
-   - Table `incident_audio(incident_id uuid, lang text, mp3 bytea, created_at timestamptz)` for voice alerts.
+   - ~~Table `incident_audio`~~: voice was dropped; migration `002_drop_voice` removes the table.
    - Table `events(id bigserial, time, kind text, payload jsonb)`, plus a `NOTIFY netcortex_events` trigger. The API's SSE stream reads from it.
    - Seed a `home-lab` site for the live collector.
 7. **`.env.example`** with every variable, and these values filled in:
@@ -186,16 +186,15 @@ Talk to CHR through the REST API; SSH (`asyncssh`) is the fallback if a command 
 **`IncidentWorkflow`:**
 1. Investigate with Pydantic AI's `TemporalAgent` wrapper.
 2. Run the fix check (`dry_run`).
-3. Call `speak()` for EN and UR and store the audio in `incident_audio`. This is optional: if it fails, continue.
-4. Set the status to `awaiting_approval` and wait for an `approve` or `reject` signal, up to 2 h.
-5. If approved: `apply()`, wait 5 minutes, verify.
-6. If the key metric improved, mark `resolved`. If not, run rollback and mark `rolled_back`. If rejected or timed out, mark `rejected`.
+3. Set the status to `awaiting_approval` and wait for an `approve` or `reject` signal, up to 2 h.
+4. If approved: `apply()`, wait 5 minutes, verify.
+5. If the key metric improved, mark `resolved`. If not, run rollback and mark `rolled_back`. If rejected or timed out, mark `rejected`.
 
 Every status change writes an `events` row. Every partner call has a timeout, and a failed partner call never kills the workflow.
 
 ### A9. API: `services/api` (FastAPI)
 
-- Endpoints exactly as in plan §8. Publish `/openapi.json`; the partner generates TypeScript types from it.
+- Endpoints exactly as in plan §8, except `GET /incidents/{id}/voice` (voice was dropped). Publish `/openapi.json`; the partner generates TypeScript types from it.
 - `/stream` = SSE fed by Postgres `LISTEN netcortex_events`.
 - Approve and reject send Temporal signals.
 - `/demo/scenarios` calls the partner's `simgen.inject()`.
@@ -231,7 +230,7 @@ Also record the demo video.
 | Simulator + datasets | `simgen.inject()`, `simgen replay` CLI, `sim` rows in the DB | Gate 2 |
 | Detector (TabPFN) | `detect()` | Gate 2 |
 | Docs search | `search_runbook()` | Gate 3 |
-| Voice + news | `speak()`, `check_news()` | Gate 3 |
+| News | `check_news()` | Gate 3 |
 | Web UI | consumes your API + SSE | mock mode by Gate 2, live by Gate 3 |
 | Eval runner | calls your `investigate()` | Gate 3 |
 | Hosted demo, CI | uses your `DEMO_MODE` and `infra/chr/test_templates.py` | Gate 4 |
@@ -240,7 +239,7 @@ Also record the demo video.
 
 - After `packages/core` is merged, any change to it is a **breaking change for the partner**: do it in a small PR, explain it, and tell the partner.
 - No hardcoded hosts, ports or model names. Everything comes from `Settings`.
-- Every network call has a timeout. Optional services (ElevenLabs, SerpApi, TabPFN cloud) never block an incident.
+- Every network call has a timeout. Optional services (SerpApi, TabPFN cloud) never block an incident.
 - Generated router commands come only from templates. No free-form commands from the model, ever.
 - Small, frequent commits on `a/<task>` branches, merged via PR (Entire checkpoints on each commit).
 - Prefer simple, readable code. Judges will read it.

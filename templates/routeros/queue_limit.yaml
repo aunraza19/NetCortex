@@ -22,6 +22,8 @@ apply: |
   /queue simple add name="netcortex-limit-{{ target | replace('/', '_') }}" target={{ target }} max-limit={{ upload_mbps }}M/{{ download_mbps }}M comment="netcortex:queue_limit"
 rollback: |
   /queue simple remove [find name="netcortex-limit-{{ target | replace('/', '_') }}"]
+# The cap must be at most 50% of the subscriber's current rate in its busier direction.
+checks: [cap_below_current_rate]
 verify:
   metric: rtt_ms
   goal: decrease

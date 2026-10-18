@@ -141,7 +141,26 @@ def test_param_retry_message_spells_out_the_schema():
     report, stats = run(model)
     retry = [p for p in requests[1][-1].parts if isinstance(p, RetryPromptPart)][0]
     assert "missing param 'upload_mbps'" in str(retry.content)
-    assert "needs exactly these params" in str(retry.content) and "download_mbps" in str(
-        retry.content
-    )
+    assert "needs exactly these params" in str(retry.content)
+    assert "download_mbps" in str(retry.content)
+    assert "Keep template_id 'queue_limit'" in str(retry.content)
     assert report.template_id is TemplateId.QUEUE_LIMIT and stats.output_retries == 1
+
+
+def test_cap_at_the_current_rate_is_sent_back_with_the_allowed_maximum():
+    useless = GOOD | {
+        "template_params": {"target": "10.0.0.42", "upload_mbps": 140, "download_mbps": 140}
+    }
+    model, requests = scripted(useless, GOOD)
+    report, stats = run(model)
+    assert stats.output_retries == 1 and not stats.fell_back
+    assert "not clearly below 10.0.0.42's current download rate" in stats.retry_reasons[0]
+    assert report.template_params["download_mbps"] == 20
+
+
+def test_subscriber_rates_sum_a_subnet():
+    one = facts.subscriber_rates(CASE.window, "10.0.0.42")
+    subnet = facts.subscriber_rates(CASE.window, "10.0.0.0/24")
+    assert one["current_download_mbps"] > 100
+    assert subnet["current_download_mbps"] > one["current_download_mbps"]
+    assert facts.subscriber_rates(CASE.window, "192.0.2.9") == {}

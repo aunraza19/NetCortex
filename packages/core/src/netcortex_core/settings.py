@@ -32,8 +32,6 @@ class Settings(BaseSettings):
     )
 
     # Optional cloud add-ons; missing keys make them unavailable, never blocking
-    elevenlabs_api_key: SecretStr | None = None
-    elevenlabs_voice_id: str | None = None
     serpapi_api_key: SecretStr | None = None
     sentry_dsn_backend: str | None = None
 

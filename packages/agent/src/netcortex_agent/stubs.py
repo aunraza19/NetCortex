@@ -2,8 +2,6 @@
 netcortex_core.interfaces, so `modules.py` can switch to the real ones automatically.
 """
 
-from typing import Literal
-
 from netcortex_core import NewsCheck, RunbookChunk
 
 # A few short pointers into the RouterOS docs, keyed by topic, until packages/runbook lands.
@@ -52,7 +50,3 @@ def search_runbook(query: str, k: int = 5) -> list[RunbookChunk]:
 
 def check_news(provider: str | None, target: str | None) -> NewsCheck:
     return NewsCheck(available=False, summary="Outage news check is not connected yet (stub).")
-
-
-def speak(text: str, lang: Literal["en", "ur"]) -> bytes:
-    return b""

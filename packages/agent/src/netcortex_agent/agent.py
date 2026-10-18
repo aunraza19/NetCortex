@@ -159,13 +159,20 @@ def check_fix(ctx: RunContext[Deps], report: IncidentReport) -> IncidentReport:
         )
     agent_params = fixes.get_template(report.template_id).agent_params()
     params = {k: v for k, v in report.template_params.items() if k in agent_params}
+    observed = None
+    if report.template_id is TemplateId.QUEUE_LIMIT and "target" in params:
+        try:
+            observed = facts.subscriber_rates(ctx.deps.window, str(params["target"]))
+        except ValueError:
+            observed = None  # not an IP; the schema check below reports it
     try:
-        clean = fixes.validate(report.template_id, params)
+        clean = fixes.validate(report.template_id, params, observed)
     except fixes.ParamError as exc:
         schema = {name: spec.describe() for name, spec in agent_params.items()}
         raise ModelRetry(
             f"template_params are invalid: {exc}. {report.template_id.value} needs exactly "
-            f"these params: {schema}"
+            f"these params: {schema}. Keep template_id {report.template_id.value!r} and the "
+            "rest of the report; correct only template_params."
         ) from exc
     return report.model_copy(
         update={"template_params": {k: v for k, v in clean.items() if k in agent_params}}

@@ -1,8 +1,8 @@
 """RouterOS fix templates: the only source of router commands."""
 
+from netcortex_fixes.errors import ParamError
 from netcortex_fixes.templates import (
     NONE_TEMPLATE,
-    ParamError,
     ParamSpec,
     Template,
     get_template,

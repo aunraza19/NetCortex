@@ -13,7 +13,6 @@ TABLES = [
     "forecasts",
     "incidents",
     "fix_plans",
-    "incident_audio",
     "scenario_labels",
     "runbook_chunks",
     "events",
@@ -23,9 +22,16 @@ HYPERTABLES = ["probe_metrics", "iface_metrics", "subscriber_metrics", "forecast
 
 @pytest.fixture(scope="module")
 def sql() -> str:
-    [(version, text)] = migrate.migrations()
-    assert version == "001_init"
-    return text
+    return dict(migrate.migrations())["001_init"]
+
+
+def test_migrations_run_in_order():
+    assert [version for version, _ in migrate.migrations()] == ["001_init", "002_drop_voice"]
+
+
+def test_voice_table_is_dropped_safely():
+    drop_voice = dict(migrate.migrations())["002_drop_voice"]
+    assert "DROP TABLE IF EXISTS incident_audio;" in drop_voice
 
 
 def test_every_table_is_created(sql):
@@ -39,9 +45,11 @@ def test_metric_tables_are_hypertables_with_site_time_indexes(sql):
         assert f"ON {table} (site_id, time DESC)" in sql
 
 
-def test_migration_is_idempotent(sql):
-    creates = re.findall(r"CREATE (?:UNIQUE )?(?:TABLE|INDEX|EXTENSION) (?!IF NOT EXISTS)", sql)
-    assert creates == []
+def test_migrations_are_idempotent(sql):
+    for _, text in migrate.migrations():
+        unsafe_create = r"CREATE (?:UNIQUE )?(?:TABLE|INDEX|EXTENSION) (?!IF NOT EXISTS)"
+        assert re.findall(unsafe_create, text) == []
+        assert re.findall(r"DROP (?:TABLE|INDEX|TRIGGER) (?!IF EXISTS)", text) == []
     assert "DROP TRIGGER IF EXISTS events_notify" in sql
     assert "ON CONFLICT (id) DO NOTHING" in sql  # home-lab seed
 
@@ -75,7 +83,7 @@ class FakeConn:
 
 def test_apply_pending_runs_each_migration_once():
     conn = FakeConn()
-    assert migrate.apply_pending(conn) == ["001_init"]
+    assert migrate.apply_pending(conn) == ["001_init", "002_drop_voice"]
     assert migrate.apply_pending(conn) == []
 
 
