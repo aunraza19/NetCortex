@@ -98,7 +98,7 @@ class Verify(BaseModel):
 class Template(BaseModel):
     id: TemplateId
     description: str
-    status: str = "untested on CHR"
+    status: str = "untested on CHR"  # set to "tested on CHR (...)" once test_templates passes
     allowed_causes: list[Cause]
     params: dict[str, ParamSpec] = {}
     apply: str = ""

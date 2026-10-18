@@ -1,6 +1,6 @@
 id: failover_route
 description: Add a backup default route and let the router drop the primary when its gateway stops answering pings.
-status: untested on CHR
+status: tested on CHR (RouterOS 7.24.5)
 allowed_causes: [uplink_down]
 params:
   primary_gateway:

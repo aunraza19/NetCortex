@@ -31,6 +31,8 @@
 - **Networking:** the laptop and Mac share the home Wi-Fi, so the laptop uses the Mac's LAN address (Tailscale isn't installed on the laptop). The partner reaches the Mac through Tailscale.
 - **Fallback:** if Tailscale fails, pull the partner's code from GitHub and run everything on the laptop. The laptop reaches the Mac over the home LAN.
 - **Database:** Tiger Cloud (TimescaleDB + pgvector), shared by both people.
+- **CHR test router:** QEMU for Windows (TCG; WHPX loses the NICs) runs RouterOS 7.24.5 locally. `infra\chr\start.ps1` boots it (REST `127.0.0.1:9180`, SSH `127.0.0.1:9122`), `reset.ps1` restores the baseline. `CHR_PASSWORD` is in `.env` only. All 4 templates pass `infra/chr/test_templates.py`.
+- **Laptop quirks:** the Fedora WSL distro is broken (missing disk), Docker Desktop is usually off, and `uv` lives in `%APPDATA%\Python\Python315\Scripts`.
 
 **Do not download large files on the laptop while the Mac model download runs.** Both share the home connection. Small Docker images and the CHR image are fine.
 

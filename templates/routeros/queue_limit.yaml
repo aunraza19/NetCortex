@@ -1,6 +1,6 @@
 id: queue_limit
 description: Cap one subscriber IP or subnet so it cannot fill the uplink.
-status: untested on CHR
+status: tested on CHR (RouterOS 7.24.5)
 allowed_causes: [heavy_user]
 params:
   target:

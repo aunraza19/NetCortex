@@ -1,6 +1,6 @@
 id: dns_servers
 description: Switch the router's upstream DNS resolvers and clear its DNS cache.
-status: untested on CHR
+status: tested on CHR (RouterOS 7.24.5)
 allowed_causes: [dns_slow]
 params:
   servers:

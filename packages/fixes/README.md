@@ -23,8 +23,8 @@ apply, rollback = fixes.render("queue_limit", params)
 | `none` (built-in) | any | No commands; notify only |
 
 Each file has `id`, `description`, `allowed_causes`, typed `params`, `apply` and `rollback`
-(Jinja), and `verify` (which metric must move and by how much). All four are marked
-**untested on CHR** until the CHR dry run (A4/A6) has passed them.
+(Jinja), and `verify` (which metric must move and by how much). All four are
+marked **tested on CHR (RouterOS 7.24.5)**.
 
 ## Safety
 
@@ -45,6 +45,25 @@ Each file has `id`, `description`, `allowed_causes`, typed `params`, `apply` and
 - Params marked `set_by: router` (for example `dns_servers.previous_servers`) are filled in
   by the fix checker from the router, never by the agent.
 
+## Dry run and apply (CHR only)
+
+```python
+plan = fixes.check_fix(incident_id, "queue_limit", params)  # dry-run on CHR, stored in fix_plans
+fixes.apply(plan)  # only if plan.decision == "approved" and plan.dry_run_ok
+fixes.rollback(plan)
+```
+
+`dry_run` exports the config, applies the commands, exports again and diffs, rolls back, and
+checks the config is exactly the original. It passes only if all four steps hold.
+Router-filled params, such as the DNS servers before the change, are read from CHR first.
+
+- `RouterClient` talks REST to `CHR_REST_URL` and runs one command line per
+  `POST /rest/execute`, so a failure names the line.
+- `apply` and `rollback` refuse anything but `APPLY_TARGET=chr`.
+
+All four templates pass on CHR 7.24.5 (`infra/chr/test_templates.py`).
+
 ```bash
-uv run pytest packages/fixes
+uv run pytest packages/fixes            # unit tests with a fake router
+uv run pytest -m live packages/fixes    # against the running CHR
 ```

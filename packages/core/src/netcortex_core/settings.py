@@ -43,8 +43,13 @@ class Settings(BaseSettings):
     # Routers. Fixes go to CHR unless APPLY_TARGET=real is set explicitly.
     apply_target: Literal["chr", "real"] = "chr"
     chr_rest_url: str | None = None
-    chr_username: str | None = None
-    chr_password: SecretStr | None = None
+    # CHR_REST_USERNAME / CHR_REST_PASSWORD are what the partner's CI bootstrap writes.
+    chr_username: str | None = Field(
+        default=None, validation_alias=AliasChoices("CHR_USERNAME", "CHR_REST_USERNAME")
+    )
+    chr_password: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("CHR_PASSWORD", "CHR_REST_PASSWORD")
+    )
 
     # Live collector
     site_id_live: str = "home-lab"

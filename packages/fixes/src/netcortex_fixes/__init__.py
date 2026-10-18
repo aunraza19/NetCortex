@@ -1,6 +1,8 @@
 """RouterOS fix templates: the only source of router commands."""
 
+from netcortex_fixes.checker import DryRun, apply, check_fix, dry_run, rollback
 from netcortex_fixes.errors import ParamError
+from netcortex_fixes.router import RouterClient, RouterError
 from netcortex_fixes.templates import (
     NONE_TEMPLATE,
     ParamSpec,
@@ -13,6 +15,13 @@ from netcortex_fixes.templates import (
 )
 
 __all__ = [
+    "DryRun",
+    "RouterClient",
+    "RouterError",
+    "apply",
+    "check_fix",
+    "dry_run",
+    "rollback",
     "NONE_TEMPLATE",
     "ParamError",
     "ParamSpec",
