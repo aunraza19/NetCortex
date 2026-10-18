@@ -117,3 +117,17 @@ def test_insert_event_returns_the_new_id():
 def test_missing_database_url_is_a_clear_error():
     with pytest.raises(RuntimeError, match="DATABASE_URL is not set"):
         db.database_url(Settings(_env_file=None, database_url=None))
+
+
+def test_fetch_site_builds_a_site_from_the_row():
+    class SiteCursor(FakeCursor):
+        def fetchone(self):
+            uplinks = [{"iface": "ether1", "role": "primary", "capacity_mbps": 180}]
+            return ("north-tower", "North Tower", uplinks, [], 120)
+
+    class SiteConn(FakeConn):
+        def cursor(self):
+            return SiteCursor(self.log)
+
+    site = db.fetch_site(SiteConn(), "north-tower")
+    assert site.uplinks[0].iface == "ether1" and site.subscribers == 120

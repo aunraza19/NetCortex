@@ -166,3 +166,15 @@ def insert_event(conn: Connection, kind: EventKind, payload: dict[str, Any]) -> 
         row = cur.fetchone()
     assert row is not None
     return row[0]
+
+
+def fetch_site(conn: Connection, site_id: str) -> Site | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, uplinks, targets, subscribers FROM sites WHERE id = %s", (site_id,)
+        )
+        row = cur.fetchone()
+    if row is None:
+        return None
+    site_id, name, uplinks, targets, subscribers = row
+    return Site(id=site_id, name=name, uplinks=uplinks, targets=targets, subscribers=subscribers)
