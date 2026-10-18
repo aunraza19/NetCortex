@@ -17,13 +17,12 @@ from jinja2.sandbox import SandboxedEnvironment
 from netcortex_core import Cause, TemplateId
 from pydantic import BaseModel
 
+from netcortex_fixes.checks import CHECKS, Observed
+from netcortex_fixes.errors import ParamError
+
 TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "templates" / "routeros"
 
 ParamType = Literal["int", "str", "enum", "ipv4", "ipv4_or_cidr", "ipv4_list"]
-
-
-class ParamError(ValueError):
-    """A parameter is missing, unknown or outside its schema."""
 
 
 class ParamSpec(BaseModel):
@@ -105,6 +104,7 @@ class Template(BaseModel):
     apply: str = ""
     rollback: str = ""
     verify: Verify | None = None
+    checks: list[str] = []  # names in netcortex_fixes.checks.CHECKS
 
     def agent_params(self) -> dict[str, ParamSpec]:
         """Parameters the agent fills in (router-filled ones are left out)."""
@@ -131,6 +131,9 @@ def load_templates(directory: Path = TEMPLATES_DIR) -> dict[TemplateId, Template
         template = Template.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
         if path.stem != template.id.value:
             raise ValueError(f"{path.name} declares id {template.id.value!r}")
+        unknown = set(template.checks) - set(CHECKS)
+        if unknown:
+            raise ValueError(f"{path.name} names unknown checks: {sorted(unknown)}")
         templates[template.id] = template
     return templates
 
@@ -150,8 +153,14 @@ def templates_for(cause: Cause | str) -> list[Template]:
     return [*allowed, NONE_TEMPLATE]
 
 
-def validate(template_id: TemplateId | str, params: dict[str, Any]) -> dict[str, Any]:
-    """Check params against the template's schema and fill defaults. Raises ParamError."""
+def validate(
+    template_id: TemplateId | str, params: dict[str, Any], observed: Observed | None = None
+) -> dict[str, Any]:
+    """Check params against the template's schema and fill defaults. Raises ParamError.
+
+    With `observed` (current network values, e.g. the subscriber's rate), the template's
+    checks run too.
+    """
     template = get_template(template_id)
     unknown = set(params) - set(template.params)
     if unknown:
@@ -164,6 +173,9 @@ def validate(template_id: TemplateId | str, params: dict[str, Any]) -> dict[str,
             clean[name] = spec.default
         else:
             raise ParamError(f"missing param {name!r} for {template.id.value}")
+    if observed is not None:
+        for check in template.checks:
+            CHECKS[check](clean, observed)
     return clean
 
 

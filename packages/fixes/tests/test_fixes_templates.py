@@ -89,3 +89,35 @@ def test_none_takes_no_params_and_renders_nothing():
 def test_router_filled_params_are_hidden_from_the_agent():
     dns = load_templates()[TemplateId.DNS_SERVERS]
     assert list(dns.agent_params()) == ["servers"]
+
+
+HEAVY = {"current_download_mbps": 140.0, "current_upload_mbps": 14.0}
+
+
+def test_queue_limit_cap_must_be_at_most_half_the_current_rate():
+    ok = {**VALID["queue_limit"], "download_mbps": 70}
+    assert validate("queue_limit", ok, HEAVY)["download_mbps"] == 70
+    too_high = {**VALID["queue_limit"], "download_mbps": 140}
+    with pytest.raises(ParamError) as error:
+        validate("queue_limit", too_high, HEAVY)
+    message = str(error.value)
+    assert "not clearly below 10.0.0.42's current download rate of 140 Mbit/s" in message
+    assert "at most 70" in message
+
+
+def test_queue_limit_checks_the_busier_direction():
+    uploader = {"current_download_mbps": 3.0, "current_upload_mbps": 60.0}
+    params = {**VALID["queue_limit"], "upload_mbps": 50, "download_mbps": 2}
+    with pytest.raises(ParamError, match="upload_mbps=50 .* at most 30"):
+        validate("queue_limit", params, uploader)
+
+
+def test_queue_limit_rejects_capping_a_light_user():
+    with pytest.raises(ParamError, match="only uses 0.8 Mbit/s"):
+        validate("queue_limit", VALID["queue_limit"], {"current_download_mbps": 0.8})
+
+
+def test_queue_limit_checks_skip_without_observations():
+    params = {**VALID["queue_limit"], "download_mbps": 900}
+    assert validate("queue_limit", params)["download_mbps"] == 900
+    assert validate("queue_limit", params, {})["download_mbps"] == 900

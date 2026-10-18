@@ -2,6 +2,7 @@
 the model. Kept free of model code so they're easy to test.
 """
 
+import ipaddress
 from datetime import timedelta
 from typing import Any
 
@@ -60,6 +61,27 @@ def metric_summary(window: MetricsWindow, series: str, minutes: int) -> dict[str
             "max": round(float(measured.max()), 2),
         }
     return summary
+
+
+def subscriber_rates(window: MetricsWindow, target: str) -> dict[str, float]:
+    """Current download/upload Mbit/s of an IP or subnet: the latest row of each matching IP.
+
+    Empty when the window has no subscriber data for the target.
+    """
+    network = ipaddress.ip_network(target, strict=False)
+    frame = window.subscriber_metrics
+    if frame.empty:
+        return {}
+    in_target = frame["ip"].astype(str).map(lambda ip: ipaddress.ip_address(ip) in network)
+    rows = frame[in_target]
+    if rows.empty:
+        return {}
+    latest = rows.assign(_t=pd.to_datetime(rows["time"], utc=True)).sort_values("_t")
+    latest = latest.groupby("ip").tail(1)
+    return {
+        "current_download_mbps": float(latest["rx_bps"].sum()) / 1e6,
+        "current_upload_mbps": float(latest["tx_bps"].sum()) / 1e6,
+    }
 
 
 def forecast_summary(detection: DetectionResult, series: str) -> dict[str, Any]:

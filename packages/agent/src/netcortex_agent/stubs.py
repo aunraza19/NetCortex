@@ -50,4 +50,3 @@ def search_runbook(query: str, k: int = 5) -> list[RunbookChunk]:
 
 def check_news(provider: str | None, target: str | None) -> NewsCheck:
     return NewsCheck(available=False, summary="Outage news check is not connected yet (stub).")
-

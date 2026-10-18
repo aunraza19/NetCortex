@@ -29,7 +29,12 @@ report = await investigate(site_id, detection, window)  # netcortex_core.Investi
    automatically.
 3. **Output check:** the template must be allowed for the report's cause, and its params
    must pass `netcortex_fixes.validate`.
-   - The error, including the template's full param schema, goes back to the model once.
+   - For `queue_limit`, the target's current rate from the window is passed in, so a cap
+     that wouldn't limit anything is rejected.
+   - The error goes back to the model once. It includes the template's full param schema
+     and says to keep the template and fix only the params. Before that last line was
+     added, Gemma usually answered a retry by switching to `none`; after it, 6 of 6
+     `heavy_user` runs returned `queue_limit` on 10.0.0.42, two of them after a retry.
    - If the second try also fails, the report falls back to template `none`, with the
      detector's cause and a confidence of at most 0.3.
    - Router-filled params are dropped, and defaults are filled in.
