@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.11.5",
+  "checkpoint_id": "01M57QH1AR8YQNTD4PD9BZK1S9",
+  "strategy": "manual-commit",
+  "branch": "a/core",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "packages/core/pyproject.toml",
+    "packages/core/src/netcortex_core/__init__.py",
+    "packages/core/src/netcortex_core/interfaces.py",
+    "packages/core/src/netcortex_core/schemas.py",
+    "packages/core/src/netcortex_core/settings.py",
+    "packages/core/tests/test_core_interfaces.py",
+    "packages/core/tests/test_core_schemas.py",
+    "packages/core/tests/test_core_settings.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 43871,
+    "cache_read_tokens": 3080123,
+    "output_tokens": 36724,
+    "api_call_count": 18
+  }
+}
