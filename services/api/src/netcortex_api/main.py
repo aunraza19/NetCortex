@@ -117,7 +117,8 @@ def health() -> Health:
 
 @app.get("/sites")
 def sites() -> list[SiteHealth]:
-    return store.sites()
+    """The sites this deployment monitors (MONITOR_SITES), with their current health."""
+    return [site for site in store.sites() if site.id in settings.monitor_sites]
 
 
 @app.get("/metrics")

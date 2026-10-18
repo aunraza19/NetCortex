@@ -1,5 +1,5 @@
-"""Minimal stand-in for packages/simgen's inject() until it merges. Same interface:
-inject(site_id, scenario_type, duration_min, seed) -> ScenarioLabel.
+"""The scripted incident injector for the simulated site. Same interface as the partner's
+experimental simulator: inject(site_id, scenario_type, duration_min, seed) -> ScenarioLabel.
 
 It writes source=sim rows for the sim site `sim-tower`, whose layout mirrors the CHR
 baseline (gateways, subscriber IPs, DNS resolver), so fixes chosen for it apply to CHR:

@@ -1,9 +1,9 @@
 """MonitorSiteWorkflow (one per site) and IncidentWorkflow (one per incident).
 
-Incident flow: TabPFN second opinion (optional) -> investigate (TemporalAgent) -> dry run
-on CHR -> awaiting_approval -> approve/reject signal (or time out) -> apply on CHR -> watch
--> verify -> resolved, or roll back -> rolled_back. A failed partner or model call never
-kills a workflow: the incident goes on without it, or falls back to a notify-only report.
+Incident flow: investigate (TemporalAgent) -> dry run on CHR -> awaiting_approval ->
+approve/reject signal (or time out) -> apply on CHR -> watch -> verify -> resolved, or
+roll back -> rolled_back. A failed model call never kills a workflow: the incident falls
+back to a notify-only report.
 """
 
 from datetime import datetime, timedelta
@@ -17,9 +17,8 @@ from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     import netcortex_fixes as fixes
-    from netcortex_agent import facts
-    from netcortex_agent.agent import Deps, fallback_report, with_news
-    from netcortex_core import DetectionResult, FixPlan, IncidentReport, IncidentStatus, TemplateId
+    from netcortex_agent.agent import Deps, fallback_report
+    from netcortex_core import FixPlan, IncidentReport, IncidentStatus, TemplateId
     from pydantic_ai.durable_exec.temporal import PydanticAIWorkflow
 
     from netcortex_worker import activities as act
@@ -27,13 +26,12 @@ with workflow.unsafe.imports_passed_through():
 
 RETRY = RetryPolicy(maximum_attempts=3, initial_interval=timedelta(seconds=2))
 SHORT = timedelta(seconds=60)
-SECOND_OPINION_TIMEOUT = timedelta(seconds=150)  # TabPFN cloud took ~115 s in Gate 2
 
 
 class Timing(BaseModel):
     monitor_interval_s: float = 60
     approval_timeout_s: float = 7200
-    verify_wait_s: float = 300
+    verify_wait_s: float = 60
 
 
 class MonitorInput(BaseModel):
@@ -122,40 +120,20 @@ class IncidentWorkflow(PydanticAIWorkflow):
             retry_policy=RETRY,
         )
 
-    async def _second_opinion(self, inp: IncidentInput) -> DetectionResult | None:
+    async def _investigate(self, inp: IncidentInput) -> IncidentReport:
         try:
-            return await workflow.execute_activity(
-                act.second_opinion,
-                args=[inp.incident_id, inp.site_id, inp.opened_at],
-                start_to_close_timeout=SECOND_OPINION_TIMEOUT,
-                retry_policy=RetryPolicy(maximum_attempts=1),
+            result = await temporal_agent.run(
+                inp.prompt, deps=inp.deps, model_settings=AGENT_SETTINGS
             )
-        except ActivityError as exc:  # timed out or failed: investigate without it
-            workflow.logger.warning("TabPFN second opinion skipped: %s", exc)
-            return None
-
-    async def _investigate(
-        self, inp: IncidentInput, tabpfn: DetectionResult | None
-    ) -> IncidentReport:
-        prompt, deps = inp.prompt, inp.deps
-        if tabpfn is not None:
-            prompt = f"{prompt}\n{facts.second_opinion_prompt(tabpfn)}"
-            deps = deps.model_copy(update={"tabpfn": tabpfn})
-        try:
-            result = await temporal_agent.run(prompt, deps=deps, model_settings=AGENT_SETTINGS)
-            return with_news(result.output, result.all_messages())
+            return result.output
         except Exception as exc:  # model down or invalid twice: notify-only report
             workflow.logger.warning("investigation failed, using template none: %s", exc)
             return fallback_report(inp.deps.detection)
 
     @workflow.run
     async def run(self, inp: IncidentInput) -> str:
-        # 1. Investigate, with TabPFN's second opinion as extra evidence if it answers.
-        tabpfn = await self._second_opinion(inp)
-        report = await self._investigate(inp, tabpfn)
-        if tabpfn is not None:
-            evidence = [*report.evidence, facts.second_opinion_evidence(tabpfn)]
-            report = report.model_copy(update={"evidence": evidence})
+        # 1. Investigate.
+        report = await self._investigate(inp)
         await workflow.execute_activity(
             act.save_report,
             args=[inp.incident_id, inp.site_id, report],

@@ -28,10 +28,11 @@ It uses continue-as-new every 60 rounds.
    detection's series.
 5. Improved means `resolved`. Not improved (or apply failed) means roll back, then `rolled_back`.
 
-Every status change writes an `events` row, which the API streams over SSE. If the model or
-a partner module fails, the incident gets a notify-only report (template `none`); the
-workflow itself never fails.
+Every status change writes an `events` row, which the API streams over SSE. If the model
+fails, the incident gets a notify-only report (template `none`); the workflow itself never
+fails.
 
 **Sentry:** every activity runs in a transaction. All activities of one incident share a
 trace whose ID is the incident's UUID without dashes. There are manual spans for `detect`,
-`check_fix`, `apply` and `rollback`, plus Pydantic AI spans for model and tool calls.
+`check_fix`, `apply` and `rollback`, and a `gen_ai.chat` span (model, token counts) for each
+Gemma request. Each activity has its own Sentry scope.

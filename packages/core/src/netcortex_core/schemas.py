@@ -303,7 +303,6 @@ class IncidentReport(BaseModel):
     likely_cause: Cause
     confidence: float = Field(ge=0, le=1)
     evidence: list[str] = []
-    upstream_check: NewsCheck | None = None
     template_id: TemplateId
     template_params: dict[str, Any] = {}  # checked against the template schema by fixes
     customer_message_en: str = Field(min_length=1, max_length=320)

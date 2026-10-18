@@ -83,11 +83,6 @@ async function loadSites() {
       ),
     ),
   );
-  const picker = document.getElementById("sim-site");
-  const current = picker.value || "sim-tower";
-  picker.replaceChildren(
-    ...sites.map((site) => h("option", { value: site.id, selected: site.id === current }, site.name)),
-  );
 }
 
 // --- Incident list ---------------------------------------------------------------------
@@ -193,9 +188,6 @@ function diagnosis(incident, report) {
       h("dt", {}, "Proposed fix"),
       h("dd", { class: "mono" },
         report.template_id === "none" ? "none (notify only)" : `${report.template_id}  ${params}`),
-      report.upstream_check?.available && [
-        h("dt", {}, "Upstream"), h("dd", {}, report.upstream_check.summary),
-      ],
     ),
     report.evidence.length > 0 && [
       h("h3", {}, "Evidence"),
@@ -295,12 +287,12 @@ document.getElementById("simulate").addEventListener("submit", async (event) => 
   note.textContent = "Injecting.";
   try {
     const label = await post("/demo/scenarios", {
-      site_id: form.get("site_id"),
       scenario_type: form.get("scenario_type"),
       duration_min: Number(form.get("duration_min")),
     });
-    note.textContent = `Injected ${words(label.scenario_type)} on ${label.site_id} until ` +
-      `${clock(label.end_at)}. The monitor checks every minute.`;
+    note.textContent = `Injected ${words(label.scenario_type)} until ${clock(label.end_at)}. ` +
+      "The monitor checks every minute. Approve after the scenario ends: the simulated " +
+      "recovery starts then.";
   } catch (error) {
     note.textContent = error.message;
   } finally {

@@ -3,7 +3,7 @@ import json
 
 import pytest
 from netcortex_agent import agent, cases, facts
-from netcortex_core import Investigate, NewsCheck, Settings, TemplateId, conforms
+from netcortex_core import IncidentReport, Investigate, Settings, TemplateId, conforms
 from pydantic_ai.messages import ModelMessage, ModelResponse, RetryPromptPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
@@ -88,17 +88,10 @@ def test_router_filled_params_are_dropped_from_the_report():
     assert report.template_params == {"servers": ["1.1.1.1", "8.8.8.8"]}
 
 
-def test_news_check_result_is_copied_into_the_report(monkeypatch):
-    news = NewsCheck(available=True, outage_reported=True, summary="ISP outage reported.")
-    monkeypatch.setattr(agent.modules, "check_news", lambda provider, target: news)
-    output = GOOD | {
-        "likely_cause": "upstream_degradation",
-        "template_id": "none",
-        "template_params": {},
-    }
-    report, stats = run(TestModel(call_tools=["check_news"], custom_output_args=output))
-    assert stats.tool_calls == ["check_news"]
-    assert report.upstream_check == news
+def test_the_agent_has_only_its_three_tools_and_no_news_field():
+    _, stats = run(TestModel(custom_output_args=GOOD))
+    assert set(stats.tool_calls) == {"get_metrics", "get_forecast", "list_templates"}
+    assert "upstream_check" not in IncidentReport.model_fields
 
 
 def test_list_templates_offers_only_allowed_templates_and_agent_params():

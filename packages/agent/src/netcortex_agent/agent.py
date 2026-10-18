@@ -20,8 +20,6 @@ from netcortex_core import (
     DetectionResult,
     IncidentReport,
     MetricsWindow,
-    ModuleUnavailable,
-    NewsCheck,
     Settings,
     Site,
     TemplateId,
@@ -36,17 +34,15 @@ from pydantic_ai.messages import (
     ModelResponse,
     RetryPromptPart,
     ToolCallPart,
-    ToolReturnPart,
 )
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.ollama import OllamaProvider
 
-from netcortex_agent import facts, modules
+from netcortex_agent import facts
 
 log = logging.getLogger(__name__)
 
 MODEL_TIMEOUT_S = 180  # one model request; a full report on a 4B model can take a while
-PARTNER_TIMEOUT_S = 15  # runbook search and news check
 
 INSTRUCTIONS = """\
 You investigate network incidents for a small internet provider that runs MikroTik routers.
@@ -56,8 +52,7 @@ Work in this order:
 2. Decide the likely cause. Causes: uplink_congestion, heavy_user, upstream_degradation,
    game_route_issue, wireless_interference, uplink_down, dns_slow, normal.
 3. Call list_templates with that cause. Pick template_id only from its result.
-4. For upstream_degradation or game_route_issue, call check_news.
-5. Return the incident report.
+4. Return the incident report.
 
 Rules:
 - template_params must match the chosen template's params exactly: names, types, limits.
@@ -81,7 +76,6 @@ class Deps(BaseModel):
     detection: DetectionResult
     window: facts.WindowData
     site: Site | None = None
-    tabpfn: DetectionResult | None = None  # second opinion, when the partner's detector ran
     _metrics: MetricsWindow | None = PrivateAttr(default=None)
 
     def metrics(self) -> MetricsWindow:
@@ -131,9 +125,6 @@ def get_metrics(ctx: RunContext[Deps], series: str, minutes: int = 15) -> dict[s
 @incident_agent.tool
 def get_forecast(ctx: RunContext[Deps], series: str) -> dict[str, Any]:
     """The detector's p10/p50/p90 forecast for one series, 1-5 minutes ahead."""
-    tabpfn = ctx.deps.tabpfn
-    if tabpfn and any(f.series_key == series for f in tabpfn.series):
-        return facts.forecast_summary(tabpfn, series) | {"model": tabpfn.model}
     return facts.forecast_summary(ctx.deps.detection, series)
 
 
@@ -148,32 +139,6 @@ def list_templates(cause: Cause) -> list[dict[str, Any]]:
         }
         for template in fixes.templates_for(cause)
     ]
-
-
-@incident_agent.tool_plain
-async def search_runbook(query: str) -> list[dict[str, Any]] | str:
-    """Search MikroTik RouterOS documentation. Returns the top 3 passages."""
-    try:
-        chunks = await asyncio.wait_for(
-            asyncio.to_thread(modules.search_runbook, query, 3), PARTNER_TIMEOUT_S
-        )
-    except (ModuleUnavailable, TimeoutError) as exc:
-        return f"runbook search unavailable ({type(exc).__name__})"
-    return [
-        chunk.model_dump(include={"title", "section", "text", "source_url"}) for chunk in chunks
-    ]
-
-
-@incident_agent.tool_plain
-async def check_news(provider: str | None = None, target: str | None = None) -> dict[str, Any]:
-    """Search recent news for an outage at the upstream provider or a game server."""
-    try:
-        news = await asyncio.wait_for(
-            asyncio.to_thread(modules.check_news, provider, target), PARTNER_TIMEOUT_S
-        )
-    except (ModuleUnavailable, TimeoutError) as exc:
-        news = NewsCheck(available=False, summary=f"Outage check failed ({type(exc).__name__}).")
-    return news.model_dump(mode="json")
 
 
 @incident_agent.output_validator
@@ -246,18 +211,6 @@ def load_site(site_id: str) -> Site | None:
         return None
 
 
-def with_news(report: IncidentReport, messages: list[ModelMessage]) -> IncidentReport:
-    """Copy the last check_news result into the report if the model left it out."""
-    if report.upstream_check is not None:
-        return report
-    for message in reversed(messages):
-        for part in message.parts:
-            if isinstance(part, ToolReturnPart) and part.tool_name == "check_news":
-                news = NewsCheck.model_validate(part.content)
-                return report.model_copy(update={"upstream_check": news})
-    return report
-
-
 def _stats(messages: list[ModelMessage], started: float) -> RunStats:
     stats = RunStats(seconds=round(time.perf_counter() - started, 1))
     for message in messages:
@@ -298,8 +251,7 @@ async def run_investigation(
             stats = _stats(messages, started)
             stats.fell_back = True
             return fallback_report(detection), stats
-    report = with_news(result.output, result.all_messages())
-    return report, _stats(result.all_messages(), started)
+    return result.output, _stats(result.all_messages(), started)
 
 
 async def investigate(
