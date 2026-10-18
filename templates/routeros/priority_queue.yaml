@@ -1,0 +1,35 @@
+id: priority_queue
+description: Give DNS and game traffic priority over bulk traffic on a congested uplink.
+status: untested on CHR
+allowed_causes: [uplink_congestion]
+params:
+  uplink:
+    type: str
+    regex: '^[A-Za-z0-9._-]{1,32}$'
+    description: Uplink interface name, e.g. ether1.
+  uplink_mbps:
+    type: int
+    min: 1
+    max: 10000
+    description: Queue limit in Mbit/s, about 90% of the uplink's real capacity.
+  game_ports:
+    type: str
+    regex: '^\d{1,5}(-\d{1,5})?(,\d{1,5}(-\d{1,5})?){0,9}$'
+    default: '3074,3478-3480,27015-27050'
+    description: UDP ports of the games to prioritise, comma separated, ranges allowed.
+# Shapes upload on the uplink interface. Packets are marked in prerouting, so marks apply
+# to traffic from the LAN towards the uplink.
+apply: |
+  /ip firewall mangle add chain=prerouting protocol=udp dst-port=53 action=mark-packet new-packet-mark=netcortex-priority passthrough=no comment="netcortex:priority_queue"
+  /ip firewall mangle add chain=prerouting protocol=udp dst-port={{ game_ports }} action=mark-packet new-packet-mark=netcortex-priority passthrough=no comment="netcortex:priority_queue"
+  /queue tree add name=netcortex-uplink parent={{ uplink }} max-limit={{ uplink_mbps }}M comment="netcortex:priority_queue"
+  /queue tree add name=netcortex-priority parent=netcortex-uplink packet-mark=netcortex-priority priority=1 comment="netcortex:priority_queue"
+  /queue tree add name=netcortex-bulk parent=netcortex-uplink packet-mark=no-mark priority=8 comment="netcortex:priority_queue"
+rollback: |
+  /queue tree remove [find parent="netcortex-uplink"]
+  /queue tree remove [find name="netcortex-uplink"]
+  /ip firewall mangle remove [find comment="netcortex:priority_queue"]
+verify:
+  metric: rtt_ms
+  goal: decrease
+  by_pct: 20

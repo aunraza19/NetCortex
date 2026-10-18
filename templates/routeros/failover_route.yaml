@@ -1,0 +1,30 @@
+id: failover_route
+description: Add a backup default route and let the router drop the primary when its gateway stops answering pings.
+status: untested on CHR
+allowed_causes: [uplink_down]
+params:
+  primary_gateway:
+    type: ipv4
+    description: Gateway of the primary uplink's existing default route.
+  backup_gateway:
+    type: ipv4
+    description: Gateway of the backup uplink.
+  backup_distance:
+    type: int
+    min: 2
+    max: 20
+    default: 2
+    description: Route distance for the backup; higher than the primary's (usually 1).
+# check-gateway=ping on the primary route is what makes failover happen; the backup route
+# alone is never used while the primary route stays active. Rollback assumes the primary
+# route had no check-gateway before.
+apply: |
+  /ip route set [find dst-address="0.0.0.0/0" gateway="{{ primary_gateway }}"] check-gateway=ping
+  /ip route add dst-address=0.0.0.0/0 gateway={{ backup_gateway }} distance={{ backup_distance }} check-gateway=ping comment="netcortex:failover_route"
+rollback: |
+  /ip route remove [find comment="netcortex:failover_route"]
+  /ip route unset [find dst-address="0.0.0.0/0" gateway="{{ primary_gateway }}"] check-gateway
+verify:
+  metric: loss_pct
+  goal: decrease
+  by_pct: 50
